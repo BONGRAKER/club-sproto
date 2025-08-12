@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Club Sproto</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Load Socket.io client -->
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <!-- Login screen -->
+    <div id="login" class="overlay">
+      <div class="login-panel">
+        <h1>Club Sproto</h1>
+        <p>Enter your name and choose your avatar</p>
+        <input type="text" id="username" placeholder="Your name" />
+        
+        <!-- Avatar upload section -->
+        <div class="avatar-upload-section">
+          <h3>Upload Your Own Avatar</h3>
+          <input type="file" id="avatarUpload" accept="image/*" />
+          <button id="uploadBtn">Upload Avatar</button>
+          <div id="uploadStatus"></div>
+        </div>
+        
+        <div id="avatar-choice" class="avatar-selection">
+          <!-- Avatars will be injected here by client.js -->
+        </div>
+        <button id="startBtn">Enter Club</button>
+      </div>
+    </div>
+
+    <!-- Game container -->
+    <div id="game" class="hidden">
+      <canvas id="gameCanvas" width="1024" height="600"></canvas>
+      <div id="chatContainer">
+        <div id="chatMessages"></div>
+        <form id="chatForm">
+          <input id="chatInput" type="text" autocomplete="off" placeholder="Type a message…" />
+        </form>
+      </div>
+    </div>
+
+    <script src="client.js"></script>
+  </body>
+</html>
