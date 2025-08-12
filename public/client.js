@@ -77,6 +77,12 @@
   // Combat elements
   const attackBtn = document.getElementById('attackBtn');
   const currentWeapon = document.getElementById('currentWeapon');
+  const bitcoinDisplay = document.getElementById('bitcoinDisplay');
+  const bitcoinCount = document.getElementById('bitcoinCount');
+  const weaponContextMenu = document.getElementById('weaponContextMenu');
+  const pickupWeaponBtn = document.getElementById('pickupWeaponBtn');
+  const weaponName = document.getElementById('weaponName');
+  const weaponStats = document.getElementById('weaponStats');
 
   // Game state
   const avatars = [];
@@ -117,6 +123,8 @@
   let myWeaponRange = 50;
   let lastAttackTime = 0;
   let attackCooldown = 1000; // 1 second
+  let myBitcoins = 0;
+  let nearbyWeapon = null;
 
   // Particle system for cool effects
   const particles = [];
@@ -577,6 +585,37 @@
     updateWeaponDisplay();
   }
 
+  // Initialize context menu
+  function initContextMenu() {
+    // Hide context menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!weaponContextMenu.contains(e.target)) {
+        weaponContextMenu.classList.add('hidden');
+      }
+    });
+    
+    // Handle weapon pickup
+    pickupWeaponBtn.addEventListener('click', () => {
+      if (nearbyWeapon) {
+        socket.emit('pickupWeapon', nearbyWeapon.id);
+        weaponContextMenu.classList.add('hidden');
+        nearbyWeapon = null;
+      }
+    });
+  }
+
+  // Update Bitcoin display
+  function updateBitcoinDisplay(bitcoins) {
+    myBitcoins = bitcoins;
+    bitcoinCount.textContent = bitcoins;
+    
+    // Add sparkle effect when bitcoins increase
+    if (bitcoins > 0) {
+      createSparkles(bitcoinDisplay.offsetLeft + bitcoinDisplay.offsetWidth / 2, 
+                     bitcoinDisplay.offsetTop + bitcoinDisplay.offsetHeight / 2, 10);
+    }
+  }
+
   // Perform attack
   function performAttack() {
     const now = Date.now();
@@ -704,23 +743,46 @@
     }
   }
 
-  // Handle player respawn
-  function onPlayerRespawn(data) {
-    if (data.id === myId) {
-      playSound(respawnSound);
-      addChatMessage({ 
-        id: 'system', 
-        name: 'System', 
-        message: 'You respawned!' 
-      });
-      
-      // Reset weapon
-      myWeapon = 'Fists';
-      myWeaponDamage = 10;
-      myWeaponRange = 50;
-      updateWeaponDisplay();
+  // Handle player death and Bitcoin theft
+  socket.on('playerDied', (data) => {
+    const deadPlayer = players[data.id];
+    const killer = players[data.killerId];
+    
+    if (deadPlayer) {
+      deadPlayer.isDead = true;
+      deadPlayer.health = 0;
     }
-  }
+    
+    // Add chat message about Bitcoin theft
+    if (data.stolenBitcoins > 0) {
+      addChatMessage(`💀 ${deadPlayer?.name || 'Player'} was killed by ${killer?.name || 'Player'}! 💰 ${data.stolenBitcoins} bitcoins stolen!`);
+    } else {
+      addChatMessage(`💀 ${deadPlayer?.name || 'Player'} was killed by ${killer?.name || 'Player'}!`);
+    }
+    
+    // Play death sound
+    playSound(deathSound);
+    
+    // Create death particles
+    if (deadPlayer) {
+      createParticleBurst(deadPlayer.x, deadPlayer.y, 50, '#ff0000');
+    }
+  });
+  
+  // Handle player respawn
+  socket.on('playerRespawned', (data) => {
+    const player = players[data.id];
+    if (player) {
+      player.isDead = false;
+      player.health = player.maxHealth;
+      player.x = data.x;
+      player.y = data.y;
+      player.bitcoins = data.bitcoins;
+    }
+    
+    addChatMessage(`🔄 ${player?.name || 'Player'} has respawned!`);
+    playSound(respawnSound);
+  });
 
   // Weather effects
   function createWeatherEffect() {
@@ -1198,6 +1260,41 @@
     });
   }
 
+  // Check for nearby weapons and show context menu
+  function checkNearbyWeapons() {
+    if (!myPlayer) return;
+    
+    let closestWeapon = null;
+    let closestDistance = Infinity;
+    
+    weapons.forEach(weapon => {
+      const distance = Math.sqrt((myPlayer.x - weapon.x) ** 2 + (myPlayer.y - weapon.y) ** 2);
+      if (distance < 80 && distance < closestDistance) { // 80px pickup range
+        closestWeapon = weapon;
+        closestDistance = distance;
+      }
+    });
+    
+    // Update nearby weapon
+    nearbyWeapon = closestWeapon;
+    
+    // Show context menu if weapon is nearby
+    if (closestWeapon) {
+      weaponName.textContent = `Pickup ${closestWeapon.type}`;
+      weaponStats.textContent = `${closestWeapon.damage} DMG | ${closestWeapon.range} RNG`;
+      
+      // Position context menu near the weapon
+      const weaponScreenX = closestWeapon.x - cameraX;
+      const weaponScreenY = closestWeapon.y - cameraY;
+      
+      weaponContextMenu.style.left = (weaponScreenX + 40) + 'px';
+      weaponContextMenu.style.top = (weaponScreenY - 20) + 'px';
+      weaponContextMenu.classList.remove('hidden');
+    } else {
+      weaponContextMenu.classList.add('hidden');
+    }
+  }
+
   // Chat form submission
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1312,8 +1409,6 @@
 
   socket.on('attack', onAttack);
 
-  socket.on('playerRespawned', onPlayerRespawn);
-
   socket.on('weaponUpdate', (data) => {
     myWeapon = data.weapon;
     myWeaponDamage = data.damage;
@@ -1321,11 +1416,72 @@
     updateWeaponDisplay();
   });
 
+  // Handle Bitcoin updates
+  socket.on('bitcoinUpdate', (data) => {
+    const oldBitcoins = myBitcoins;
+    updateBitcoinDisplay(data.bitcoins);
+    
+    // Show earning notification if bitcoins increased
+    if (data.bitcoins > oldBitcoins) {
+      const earned = data.bitcoins - oldBitcoins;
+      if (earned === 10) {
+        addChatMessage(`💰 You earned ${earned} bitcoins! (Passive income)`);
+      } else {
+        addChatMessage(`💰 You stole ${earned} bitcoins!`);
+      }
+    }
+  });
+  
+  // Handle player death and Bitcoin theft
+  socket.on('playerDied', (data) => {
+    const deadPlayer = players[data.id];
+    const killer = players[data.killerId];
+    
+    if (deadPlayer) {
+      deadPlayer.isDead = true;
+      deadPlayer.health = 0;
+    }
+    
+    // Add chat message about Bitcoin theft
+    if (data.stolenBitcoins > 0) {
+      addChatMessage(`💀 ${deadPlayer?.name || 'Player'} was killed by ${killer?.name || 'Player'}! 💰 ${data.stolenBitcoins} bitcoins stolen!`);
+    } else {
+      addChatMessage(`💀 ${deadPlayer?.name || 'Player'} was killed by ${killer?.name || 'Player'}!`);
+    }
+    
+    // Play death sound
+    playSound(deathSound);
+    
+    // Create death particles
+    if (deadPlayer) {
+      createParticleBurst(deadPlayer.x, deadPlayer.y, 50, '#ff0000');
+    }
+  });
+  
+  // Handle player respawn
+  socket.on('playerRespawned', (data) => {
+    const player = players[data.id];
+    if (player) {
+      player.isDead = false;
+      player.health = player.maxHealth;
+      player.x = data.x;
+      player.y = data.y;
+      player.bitcoins = data.bitcoins;
+    }
+    
+    addChatMessage(`🔄 ${player?.name || 'Player'} has respawned!`);
+    playSound(respawnSound);
+  });
+
   // Main draw loop
   function draw() {
+    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw background (centered to fill canvas)
+    // Check for nearby weapons
+    checkNearbyWeapons();
+    
+    // Draw background
     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
     
     // Draw weapons on the map
@@ -1569,6 +1725,7 @@
     initEmoteControls();
     initInteractiveFeatures();
     initCombatControls(); // Initialize combat controls
+    initContextMenu(); // Initialize context menu
     
     // Start the draw loop
     requestAnimationFrame(draw);

@@ -54,13 +54,12 @@ const upload = multer({
   }
 });
 
-// Store players and their data
+// Game state
 const players = {};
-
-// Store weapons on the map
 const weapons = [];
+const bitcoins = [];
 
-// Weapon types and their properties
+// Weapon types with damage and range
 const weaponTypes = [
   { name: 'Sword', emoji: '⚔️', damage: 25, range: 80 },
   { name: 'Bow', emoji: '🏹', damage: 20, range: 150 },
@@ -71,6 +70,21 @@ const weaponTypes = [
   { name: 'Staff', emoji: '🦯', damage: 20, range: 90 },
   { name: 'Crossbow', emoji: '🏹', damage: 30, range: 120 }
 ];
+
+// Bitcoin earning system
+function earnBitcoins() {
+  Object.keys(players).forEach(playerId => {
+    if (players[playerId] && !players[playerId].isDead) {
+      players[playerId].bitcoins = (players[playerId].bitcoins || 0) + 10;
+      io.to(playerId).emit('bitcoinUpdate', {
+        bitcoins: players[playerId].bitcoins
+      });
+    }
+  });
+}
+
+// Start Bitcoin earning every 10 seconds
+setInterval(earnBitcoins, 10000);
 
 // Spawn weapons randomly on the map
 function spawnWeapon() {
@@ -176,7 +190,8 @@ io.on('connection', (socket) => {
       weaponDamage: 10,
       weaponRange: 50,
       isDead: false,
-      lastAttack: 0
+      lastAttack: 0,
+      bitcoins: 0 // Initialize bitcoins
     };
     
     players[socket.id] = player;
@@ -292,47 +307,74 @@ io.on('connection', (socket) => {
     
     if (!attacker || !target || attacker.isDead || target.isDead) return;
     
+    // Check attack cooldown (1 second)
     const now = Date.now();
-    if (now - attacker.lastAttack < 1000) return; // Attack cooldown
+    if (now - attacker.lastAttack < 1000) return;
     
+    // Check distance
     const distance = Math.sqrt((attacker.x - target.x) ** 2 + (attacker.y - target.y) ** 2);
+    if (distance > attacker.weaponRange) return;
     
-    if (distance <= attacker.weaponRange) {
-      // Attack hits
-      attacker.lastAttack = now;
-      target.health -= attacker.weaponDamage;
+    // Apply damage
+    target.health -= attacker.weaponDamage;
+    attacker.lastAttack = now;
+    
+    // Check if target died
+    if (target.health <= 0) {
+      target.isDead = true;
+      target.health = 0;
       
-      if (target.health <= 0) {
-        target.health = 0;
-        target.isDead = true;
-        
-        // Respawn after 3 seconds
-        setTimeout(() => {
-          const position = getRandomPosition();
-          target.x = position.x;
-          target.y = position.y;
-          target.health = target.maxHealth;
+      // Steal bitcoins from dead player
+      const stolenBitcoins = target.bitcoins || 0;
+      attacker.bitcoins = (attacker.bitcoins || 0) + stolenBitcoins;
+      target.bitcoins = 0;
+      
+      // Broadcast death and bitcoin theft
+      io.emit('playerDied', {
+        id: targetId,
+        killerId: socket.id,
+        stolenBitcoins: stolenBitcoins
+      });
+      
+      // Update bitcoin counts
+      io.to(socket.id).emit('bitcoinUpdate', {
+        bitcoins: attacker.bitcoins
+      });
+      io.to(targetId).emit('bitcoinUpdate', {
+        bitcoins: target.bitcoins
+      });
+      
+      // Respawn after 3 seconds
+      setTimeout(() => {
+        if (players[targetId]) {
           target.isDead = false;
+          target.health = target.maxHealth;
+          target.x = Math.random() * 900 + 50;
+          target.y = Math.random() * 500 + 50;
           target.weapon = 'Fists';
           target.weaponDamage = 10;
           target.weaponRange = 50;
-          
+          target.bitcoins = (target.bitcoins || 0) + 10; // Player earns bitcoins on death
           io.emit('playerRespawned', {
             id: targetId,
-            player: target
+            x: target.x,
+            y: target.y,
+            bitcoins: target.bitcoins
           });
-        }, 3000);
-      }
-      
-      // Broadcast attack and damage
-      io.emit('attack', {
-        attackerId: socket.id,
-        targetId: targetId,
-        damage: attacker.weaponDamage,
-        targetHealth: target.health,
-        targetDead: target.isDead
-      });
+          io.to(targetId).emit('bitcoinUpdate', {
+            bitcoins: target.bitcoins
+          });
+        }
+      }, 3000);
     }
+    
+    // Broadcast attack
+    io.emit('attack', {
+      attackerId: socket.id,
+      targetId: targetId,
+      damage: attacker.weaponDamage,
+      targetHealth: target.health
+    });
   });
 
   // Handle disconnection
