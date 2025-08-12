@@ -3,7 +3,7 @@
  *
  * This script handles the login flow, real‑time networking via socket.io,
  * drawing the game world onto a canvas, movement control, chat, avatar uploads,
- * mobile controls, and background music.
+ * mobile controls, background music, and particle effects.
  */
 
 (() => {
@@ -25,6 +25,7 @@
   const avatarUpload = document.getElementById('avatarUpload');
   const uploadBtn = document.getElementById('uploadBtn');
   const uploadStatus = document.getElementById('uploadStatus');
+  const playerCountText = document.getElementById('playerCountText');
   
   // Music elements
   const bgMusic = document.getElementById('bgMusic');
@@ -57,6 +58,39 @@
 
   // Mobile detection
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // Particle system for cool effects
+  const particles = [];
+  
+  class Particle {
+    constructor(x, y, color = '#ff69b4') {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 4;
+      this.vy = (Math.random() - 0.5) * 4;
+      this.life = 1.0;
+      this.decay = 0.02;
+      this.color = color;
+      this.size = Math.random() * 3 + 1;
+    }
+    
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.life -= this.decay;
+      this.vy += 0.1; // gravity
+    }
+    
+    draw(ctx) {
+      ctx.save();
+      ctx.globalAlpha = this.life;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
 
   // Initialize canvas scaling
   function initCanvasScaling() {
@@ -141,6 +175,24 @@
         keys[direction] = false;
       });
     });
+  }
+
+  // Create particle burst
+  function createParticleBurst(x, y, count = 10, color = '#ff69b4') {
+    for (let i = 0; i < count; i++) {
+      particles.push(new Particle(x, y, color));
+    }
+  }
+
+  // Update player count display
+  function updatePlayerCount() {
+    const count = Object.keys(players).length;
+    playerCountText.textContent = count;
+    
+    // Add some particles when players join/leave
+    if (count > 0 && count % 5 === 0) {
+      createParticleBurst(Math.random() * 1024, Math.random() * 600, 5, '#4a90e2');
+    }
   }
 
   // Load available avatars from server
@@ -320,12 +372,16 @@
     if (data.id && players[data.id]) {
       players[data.id].speech = data.message;
       players[data.id].speechExpire = Date.now() + 5000;
+      
+      // Add particles for chat messages
+      createParticleBurst(players[data.id].x + 32, players[data.id].y, 3, '#4caf50');
     } else {
       Object.keys(players).forEach((pid) => {
         const p = players[pid];
         if (p.name === data.name) {
           p.speech = data.message;
           p.speechExpire = Date.now() + 5000;
+          createParticleBurst(p.x + 32, p.y, 3, '#4caf50');
         }
       });
     }
@@ -336,20 +392,34 @@
     Object.keys(serverPlayers).forEach((id) => {
       players[id] = serverPlayers[id];
     });
+    updatePlayerCount();
   });
 
   socket.on('playerData', (data) => {
     myId = socket.id;
     myPlayer = data;
     players[myId] = data;
+    updatePlayerCount();
+    
+    // Welcome particle burst
+    createParticleBurst(data.x + 32, data.y, 15, '#ff69b4');
   });
 
   socket.on('playerJoined', (data) => {
     players[data.id] = data.player;
+    updatePlayerCount();
+    
+    // Welcome particles for new players
+    createParticleBurst(data.player.x + 32, data.player.y, 10, '#4a90e2');
   });
 
   socket.on('playerLeft', (playerId) => {
+    if (players[playerId]) {
+      // Farewell particles
+      createParticleBurst(players[playerId].x + 32, players[playerId].y, 8, '#f44336');
+    }
     delete players[playerId];
+    updatePlayerCount();
   });
 
   socket.on('playerMoved', (data) => {
@@ -374,6 +444,17 @@
     
     // Draw background (centered to fill canvas)
     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+    
+    // Update and draw particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      particles[i].draw(ctx);
+      
+      // Remove dead particles
+      if (particles[i].life <= 0) {
+        particles.splice(i, 1);
+      }
+    }
     
     // Draw all players
     Object.keys(players).forEach((id) => {
