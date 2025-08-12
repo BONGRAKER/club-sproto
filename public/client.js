@@ -139,8 +139,27 @@
   // Play sound effect
   function playSound(sound) {
     if (sound) {
-      sound.currentTime = 0;
-      sound.play().catch(e => console.log('Sound play failed:', e));
+      try {
+        sound.currentTime = 0;
+        sound.play().catch(e => {
+          console.log('Sound play failed:', e);
+          // Create a simple beep sound as fallback
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.1);
+        });
+      } catch (error) {
+        console.log('Sound error:', error);
+      }
     }
   }
   
@@ -337,6 +356,13 @@
     // Set initial volume
     bgMusic.volume = volumeSlider.value / 100;
     
+    // Set volume for all sound effects
+    [pickupSound, attackSound, hitSound, deathSound, respawnSound].forEach(sound => {
+      if (sound) {
+        sound.volume = 0.5;
+      }
+    });
+    
     // Music toggle
     musicToggle.addEventListener('click', () => {
       if (bgMusic.paused) {
@@ -350,7 +376,15 @@
     
     // Volume control
     volumeSlider.addEventListener('input', (e) => {
-      bgMusic.volume = e.target.value / 100;
+      const volume = e.target.value / 100;
+      bgMusic.volume = volume;
+      
+      // Update sound effect volumes too
+      [pickupSound, attackSound, hitSound, deathSound, respawnSound].forEach(sound => {
+        if (sound) {
+          sound.volume = volume * 0.5;
+        }
+      });
     });
     
     // Try to start music on first user interaction
@@ -391,6 +425,12 @@
       });
       
       btn.addEventListener('mouseup', (e) => {
+        e.preventDefault();
+        keys[direction] = false;
+      });
+      
+      // Mouse leave to ensure button is released
+      btn.addEventListener('mouseleave', (e) => {
         e.preventDefault();
         keys[direction] = false;
       });
@@ -510,7 +550,8 @@
   // Initialize combat controls
   function initCombatControls() {
     // Attack button
-    attackBtn.addEventListener('click', () => {
+    attackBtn.addEventListener('click', (e) => {
+      e.preventDefault();
       performAttack();
     });
     
@@ -1100,18 +1141,25 @@
   const keys = {};
   window.addEventListener('keydown', (e) => {
     keys[e.key] = true;
+    
+    // Prevent default for movement keys to avoid page scrolling
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
+      e.preventDefault();
+    }
   });
   window.addEventListener('keyup', (e) => {
     keys[e.key] = false;
   });
 
   function handleMovement() {
-    if (!myPlayer) return;
+    if (!myPlayer || myPlayer.isDead) return;
+    
     const directions = [];
-    if (keys['ArrowLeft'] || keys['a'] || keys['left']) directions.push('left');
-    if (keys['ArrowRight'] || keys['d'] || keys['right']) directions.push('right');
-    if (keys['ArrowUp'] || keys['w'] || keys['up']) directions.push('up');
-    if (keys['ArrowDown'] || keys['s'] || keys['down']) directions.push('down');
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) directions.push('left');
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) directions.push('right');
+    if (keys['ArrowUp'] || keys['w'] || keys['W']) directions.push('up');
+    if (keys['ArrowDown'] || keys['s'] || keys['S']) directions.push('down');
+    
     if (directions.length > 0) {
       socket.emit('move', directions[0]);
     }
