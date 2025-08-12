@@ -64,6 +64,10 @@
   const miniGameScore = document.getElementById('miniGameScore');
   const miniGameTime = document.getElementById('miniGameTime');
   const closeMiniGame = document.getElementById('closeMiniGame');
+  
+  // Combat elements
+  const attackBtn = document.getElementById('attackBtn');
+  const currentWeapon = document.getElementById('currentWeapon');
 
   // Game state
   const avatars = [];
@@ -96,6 +100,14 @@
   let miniGameTimeLeft = 30;
   let miniGameTargets = [];
   let miniGameBullets = [];
+  
+  // Combat state
+  const weapons = [];
+  let myWeapon = 'Fists';
+  let myWeaponDamage = 10;
+  let myWeaponRange = 50;
+  let lastAttackTime = 0;
+  let attackCooldown = 1000; // 1 second
 
   // Particle system for cool effects
   const particles = [];
@@ -116,6 +128,21 @@
     '👻': { color: '#f0f8ff', particles: 70, duration: 3500 },
     '🥷': { color: '#000000', particles: 65, duration: 3000 }
   };
+  
+  // Sound effects
+  const pickupSound = document.getElementById('pickupSound');
+  const attackSound = document.getElementById('attackSound');
+  const hitSound = document.getElementById('hitSound');
+  const deathSound = document.getElementById('deathSound');
+  const respawnSound = document.getElementById('respawnSound');
+
+  // Play sound effect
+  function playSound(sound) {
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(e => console.log('Sound play failed:', e));
+    }
+  }
   
   class Particle {
     constructor(x, y, color = '#ff69b4', type = 'normal') {
@@ -478,6 +505,170 @@
         stopMiniGame();
       }
     });
+  }
+
+  // Initialize combat controls
+  function initCombatControls() {
+    // Attack button
+    attackBtn.addEventListener('click', () => {
+      performAttack();
+    });
+    
+    // Attack with spacebar
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        performAttack();
+      }
+    });
+    
+    // Update weapon display
+    updateWeaponDisplay();
+  }
+
+  // Perform attack
+  function performAttack() {
+    const now = Date.now();
+    if (now - lastAttackTime < attackCooldown) return;
+    
+    lastAttackTime = now;
+    
+    // Find closest player in range
+    let closestPlayer = null;
+    let closestDistance = Infinity;
+    
+    Object.keys(players).forEach(id => {
+      if (id !== myId && players[id] && !players[id].isDead) {
+        const distance = Math.sqrt(
+          (myPlayer.x - players[id].x) ** 2 + 
+          (myPlayer.y - players[id].y) ** 2
+        );
+        
+        if (distance <= myWeaponRange && distance < closestDistance) {
+          closestPlayer = players[id];
+          closestDistance = distance;
+        }
+      }
+    });
+    
+    if (closestPlayer) {
+      // Attack the closest player
+      socket.emit('attack', Object.keys(players).find(id => players[id] === closestPlayer));
+      
+      // Visual feedback
+      attackBtn.classList.add('attacking');
+      setTimeout(() => attackBtn.classList.remove('attacking'), 300);
+      
+      // Play attack sound
+      playSound(attackSound);
+      
+      // Create attack particles
+      createParticleBurst(myPlayer.x + 32, myPlayer.y + 32, 20, '#ff4444');
+    }
+  }
+
+  // Update weapon display
+  function updateWeaponDisplay() {
+    currentWeapon.textContent = myWeapon;
+  }
+
+  // Handle weapon pickup
+  function handleWeaponPickup(weapon) {
+    const distance = Math.sqrt(
+      (myPlayer.x - weapon.x) ** 2 + 
+      (myPlayer.y - weapon.y) ** 2
+    );
+    
+    if (distance < 50) {
+      socket.emit('pickupWeapon', weapon.id);
+      playSound(pickupSound);
+      
+      // Create pickup particles
+      createParticleBurst(weapon.x, weapon.y, 30, '#ffd700');
+    }
+  }
+
+  // Handle weapon pickup from server
+  function onWeaponPickedUp(data) {
+    if (data.playerId === myId) {
+      myWeapon = data.weapon.type;
+      myWeaponDamage = data.weapon.damage;
+      myWeaponRange = data.weapon.range;
+      updateWeaponDisplay();
+      
+      // Remove weapon from local array
+      const index = weapons.findIndex(w => w.id === data.weaponId);
+      if (index !== -1) {
+        weapons.splice(index, 1);
+      }
+      
+      // Add pickup message
+      addChatMessage({ 
+        id: 'system', 
+        name: 'System', 
+        message: `You picked up ${data.weapon.type}!` 
+      });
+    }
+  }
+
+  // Handle attack from server
+  function onAttack(data) {
+    if (data.targetId === myId) {
+      // I was attacked
+      playSound(hitSound);
+      
+      // Flash damage effect
+      if (myPlayer) {
+        myPlayer.damageFlash = Date.now() + 500;
+      }
+      
+      // Create damage particles
+      createParticleBurst(myPlayer.x + 32, myPlayer.y + 32, 25, '#ff4444');
+      
+      if (data.targetDead) {
+        playSound(deathSound);
+        addChatMessage({ 
+          id: 'system', 
+          name: 'System', 
+          message: `You were killed by ${players[data.attackerId]?.name || 'Unknown'}!` 
+        });
+      }
+    } else if (data.attackerId === myId) {
+      // I attacked someone
+      const target = players[data.targetId];
+      if (target) {
+        playSound(hitSound);
+        
+        // Create hit particles
+        createParticleBurst(target.x + 32, target.y + 32, 25, '#ff4444');
+        
+        if (data.targetDead) {
+          addChatMessage({ 
+            id: 'system', 
+            name: 'System', 
+            message: `You killed ${target.name}!` 
+          });
+        }
+      }
+    }
+  }
+
+  // Handle player respawn
+  function onPlayerRespawn(data) {
+    if (data.id === myId) {
+      playSound(respawnSound);
+      addChatMessage({ 
+        id: 'system', 
+        name: 'System', 
+        message: 'You respawned!' 
+      });
+      
+      // Reset weapon
+      myWeapon = 'Fists';
+      myWeaponDamage = 10;
+      myWeaponRange = 50;
+      updateWeaponDisplay();
+    }
   }
 
   // Weather effects
@@ -924,6 +1115,18 @@
     if (directions.length > 0) {
       socket.emit('move', directions[0]);
     }
+    
+    // Check for weapon pickups
+    weapons.forEach(weapon => {
+      const distance = Math.sqrt(
+        (myPlayer.x - weapon.x) ** 2 + 
+        (myPlayer.y - weapon.y) ** 2
+      );
+      
+      if (distance < 50) {
+        handleWeaponPickup(weapon);
+      }
+    });
   }
 
   // Chat form submission
@@ -1021,12 +1224,53 @@
     }
   });
 
+  // Combat and weapon events
+  socket.on('currentWeapons', (serverWeapons) => {
+    weapons.length = 0;
+    weapons.push(...serverWeapons);
+  });
+
+  socket.on('weaponSpawned', (weapon) => {
+    weapons.push(weapon);
+  });
+
+  socket.on('weaponPickedUp', onWeaponPickedUp);
+
+  socket.on('attack', onAttack);
+
+  socket.on('playerRespawned', onPlayerRespawn);
+
+  socket.on('weaponUpdate', (data) => {
+    myWeapon = data.weapon;
+    myWeaponDamage = data.damage;
+    myWeaponRange = data.range;
+    updateWeaponDisplay();
+  });
+
   // Main draw loop
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     // Draw background (centered to fill canvas)
     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+    
+    // Draw weapons on the map
+    weapons.forEach(weapon => {
+      ctx.save();
+      ctx.font = '20px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Draw weapon emoji
+      ctx.fillText(weapon.emoji, weapon.x, weapon.y);
+      
+      // Draw weapon name
+      ctx.font = '12px Trebuchet MS';
+      ctx.fillStyle = '#ff69b4';
+      ctx.fillText(weapon.type, weapon.x, weapon.y + 20);
+      
+      ctx.restore();
+    });
     
     // Update and draw particles - INCREASED BY 5X!
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -1068,21 +1312,54 @@
       const img = avatarObj ? avatarObj.img : null;
       if (!img) return;
       
+      // Apply damage flash effect
+      if (p.damageFlash && Date.now() < p.damageFlash) {
+        ctx.filter = 'brightness(1.5) saturate(2)';
+      }
+      
       // Draw name above head
       ctx.font = '14px Trebuchet MS';
-      ctx.fillStyle = '#ff69b4';
+      ctx.fillStyle = p.isDead ? '#666' : '#ff69b4';
       ctx.textAlign = 'center';
       ctx.fillText(p.name, p.x + 32, p.y - 10);
       
+      // Draw health bar if player has taken damage or is dead
+      if (p.health < p.maxHealth || p.isDead) {
+        drawHealthBar(p);
+      }
+      
       // Draw avatar with dance animation if dancing
       ctx.save();
-      if (p.dancing) {
+      if (p.dancing && !p.isDead) {
         ctx.translate(p.x + 32, p.y + 32);
         ctx.rotate(Math.sin(Date.now() * 0.01) * 0.1);
         ctx.translate(-(p.x + 32), -(p.y + 32));
       }
+      
+      // Draw avatar with death effect
+      if (p.isDead) {
+        ctx.globalAlpha = 0.5;
+        ctx.filter = 'grayscale(1)';
+      }
+      
       ctx.drawImage(img, p.x, p.y, 64, 64);
       ctx.restore();
+      
+      // Draw weapon indicator
+      if (!p.isDead && p.weapon !== 'Fists') {
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff4444';
+        ctx.fillText(p.weapon === 'Sword' ? '⚔️' : 
+                    p.weapon === 'Bow' ? '🏹' : 
+                    p.weapon === 'Axe' ? '🪓' : 
+                    p.weapon === 'Spear' ? '🔱' : 
+                    p.weapon === 'Hammer' ? '🔨' : 
+                    p.weapon === 'Dagger' ? '🗡️' : 
+                    p.weapon === 'Staff' ? '🦯' : 
+                    p.weapon === 'Crossbow' ? '🏹' : '⚔️', 
+                    p.x + 32, p.y - 35);
+      }
 
       // Draw speech bubble if player has a recent message
       if (p.speech && p.speechExpire && Date.now() < p.speechExpire) {
@@ -1093,6 +1370,9 @@
       if (p.emote && p.emoteExpire && Date.now() < p.emoteExpire) {
         drawEmote(p);
       }
+      
+      // Reset filter
+      ctx.filter = 'none';
     });
     
     // Movement is handled via discrete events but we continuously check keys
@@ -1163,6 +1443,40 @@
     ctx.globalAlpha = 1;
   }
 
+  /**
+   * Draw a health bar for a player
+   * @param {Object} p Player object with x, y, health, maxHealth
+   */
+  function drawHealthBar(p) {
+    const barWidth = 60;
+    const barHeight = 6;
+    const x = p.x + 32 - barWidth / 2;
+    const y = p.y - 25;
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(x, y, barWidth, barHeight);
+    
+    // Border
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, barWidth, barHeight);
+    
+    // Health fill
+    const healthPercent = p.health / p.maxHealth;
+    const fillWidth = barWidth * healthPercent;
+    
+    if (healthPercent > 0.5) {
+      ctx.fillStyle = '#4caf50'; // Green
+    } else if (healthPercent > 0.25) {
+      ctx.fillStyle = '#ff9800'; // Orange
+    } else {
+      ctx.fillStyle = '#f44336'; // Red
+    }
+    
+    ctx.fillRect(x + 1, y + 1, fillWidth - 2, barHeight - 2);
+  }
+
   // Handle window resize
   window.addEventListener('resize', () => {
     if (gameScreen.style.display !== 'none') {
@@ -1180,6 +1494,7 @@
     initMobileControls();
     initEmoteControls();
     initInteractiveFeatures();
+    initCombatControls(); // Initialize combat controls
     
     // Start the draw loop
     requestAnimationFrame(draw);

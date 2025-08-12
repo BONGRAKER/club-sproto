@@ -18,6 +18,23 @@
       <source src="music/background-music.ogg" type="audio/ogg">
     </audio>
     
+    <!-- Sound effects -->
+    <audio id="pickupSound" preload="auto">
+      <source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="attackSound" preload="auto">
+      <source src="https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="hitSound" preload="auto">
+      <source src="https://assets.mixkit.co/active_storage/sfx/2569/2569-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="deathSound" preload="auto">
+      <source src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="respawnSound" preload="auto">
+      <source src="https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3" type="audio/mpeg">
+    </audio>
+    
     <!-- Music controls -->
     <div id="musicControls" class="music-controls">
       <button id="musicToggle" class="music-btn">🎵</button>
@@ -37,6 +54,14 @@
       <button id="miniGameBtn" class="interactive-btn" title="Start Mini-Game">🎮</button>
       <button id="dancePartyBtn" class="interactive-btn" title="Dance Party Mode">🕺</button>
       <button id="confettiBtn" class="interactive-btn" title="Confetti Storm">🎊</button>
+    </div>
+
+    <!-- Combat controls -->
+    <div id="combatControls" class="combat-controls">
+      <button id="attackBtn" class="combat-btn" title="Attack">⚔️</button>
+      <div id="weaponDisplay" class="weapon-display">
+        <span id="currentWeapon">Fists</span>
+      </div>
     </div>
 
     <!-- Mini-game overlay -->

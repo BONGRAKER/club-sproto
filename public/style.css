@@ -45,6 +45,131 @@ body {
   color: #ff85c1;
 }
 
+/* Combat controls */
+.combat-controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(27, 27, 58, 0.9);
+  padding: 12px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 105, 180, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.combat-btn {
+  width: 50px;
+  height: 50px;
+  background: rgba(31, 31, 69, 0.8);
+  border: 2px solid #ff4444;
+  border-radius: 50%;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.combat-btn:hover {
+  background: #ff4444;
+  transform: scale(1.1);
+}
+
+.combat-btn:active {
+  transform: scale(0.95);
+}
+
+.combat-btn.attacking {
+  background: #ff4444;
+  animation: attack-pulse 0.3s ease-in-out;
+}
+
+.weapon-display {
+  background: rgba(31, 31, 69, 0.8);
+  border: 1px solid #ff69b4;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: #ff69b4;
+  text-align: center;
+  min-width: 80px;
+  backdrop-filter: blur(10px);
+}
+
+/* Health bar */
+.health-bar {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  border: 1px solid #fff;
+  overflow: hidden;
+}
+
+.health-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff4444, #ff6b35);
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+/* Weapon pickup */
+.weapon-pickup {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 105, 180, 0.8);
+  border: 2px solid #ff69b4;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  animation: weapon-float 2s ease-in-out infinite;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+}
+
+.weapon-pickup:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 20px rgba(255, 105, 180, 0.8);
+}
+
+/* Attack animation */
+@keyframes attack-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+@keyframes weapon-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes damage-flash {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.5) saturate(2); }
+}
+
+@keyframes death-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.5); }
+}
+
 /* Interactive features panel */
 .interactive-panel {
   position: fixed;
@@ -719,6 +844,24 @@ body {
     width: 35px;
     height: 35px;
     font-size: 16px;
+  }
+  
+  .combat-controls {
+    bottom: 10px;
+    right: 10px;
+    padding: 8px;
+  }
+  
+  .combat-btn {
+    width: 45px;
+    height: 45px;
+    font-size: 20px;
+  }
+  
+  .weapon-display {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+    min-width: 60px;
   }
   
   .emote-controls {
