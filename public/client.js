@@ -135,6 +135,7 @@
   const hitSound = document.getElementById('hitSound');
   const deathSound = document.getElementById('deathSound');
   const respawnSound = document.getElementById('respawnSound');
+  const messageSound = document.getElementById('messageSound');
 
   // Play sound effect
   function playSound(sound) {
@@ -357,7 +358,7 @@
     bgMusic.volume = volumeSlider.value / 100;
     
     // Set volume for all sound effects
-    [pickupSound, attackSound, hitSound, deathSound, respawnSound].forEach(sound => {
+    [pickupSound, attackSound, hitSound, deathSound, respawnSound, messageSound].forEach(sound => {
       if (sound) {
         sound.volume = 0.5;
       }
@@ -380,7 +381,7 @@
       bgMusic.volume = volume;
       
       // Update sound effect volumes too
-      [pickupSound, attackSound, hitSound, deathSound, respawnSound].forEach(sound => {
+      [pickupSound, attackSound, hitSound, deathSound, respawnSound, messageSound].forEach(sound => {
         if (sound) {
           sound.volume = volume * 0.5;
         }
@@ -1140,7 +1141,6 @@
   // Keyboard input for movement
   const keys = {};
   window.addEventListener('keydown', (e) => {
-    console.log('Key down:', e.key);
     keys[e.key] = true;
     
     // Prevent default for movement keys to avoid page scrolling
@@ -1149,20 +1149,13 @@
     }
   });
   window.addEventListener('keyup', (e) => {
-    console.log('Key up:', e.key);
     keys[e.key] = false;
   });
 
   function handleMovement() {
-    if (!myPlayer) {
-      console.log('No myPlayer yet');
-      return;
-    }
+    if (!myPlayer) return;
     
-    if (myPlayer.isDead) {
-      console.log('Player is dead, can\'t move');
-      return;
-    }
+    if (myPlayer.isDead) return;
     
     const directions = [];
     if (keys['ArrowLeft'] || keys['a'] || keys['A']) directions.push('left');
@@ -1171,7 +1164,6 @@
     if (keys['ArrowDown'] || keys['s'] || keys['S']) directions.push('down');
     
     if (directions.length > 0) {
-      console.log('Moving:', directions[0], 'Keys pressed:', Object.keys(keys).filter(k => keys[k]));
       socket.emit('move', directions[0]);
     }
     
@@ -1210,6 +1202,9 @@
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
+    // Play message sound
+    playSound(messageSound);
+
     // Show the message as a speech bubble above the sender's head
     if (data.id && players[data.id]) {
       players[data.id].speech = data.message;
@@ -1238,7 +1233,6 @@
   });
 
   socket.on('playerData', (data) => {
-    console.log('Received player data:', data);
     myId = socket.id;
     myPlayer = data;
     players[myId] = data;
@@ -1266,7 +1260,6 @@
   });
 
   socket.on('playerMoved', (data) => {
-    console.log('Player moved:', data);
     if (players[data.id]) {
       players[data.id].x = data.x;
       players[data.id].y = data.y;
