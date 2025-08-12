@@ -1060,6 +1060,40 @@ body {
   opacity: 0.8;
 }
 
+.context-menu-hint {
+  color: #f7931a;
+  font-size: 11px;
+  text-align: center;
+  padding: 5px;
+  border-top: 1px solid rgba(247, 147, 26, 0.3);
+  margin-top: 5px;
+}
+
+/* Weapon pickup instructions */
+.weapon-instructions {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 1000;
+  border: 2px solid #f7931a;
+  backdrop-filter: blur(10px);
+}
+
+.instruction-text {
+  text-align: center;
+}
+
+.instruction-text strong {
+  color: #f7931a;
+  font-weight: bold;
+}
+
 /* Weapon pickup indicator */
 .weapon-pickup {
   position: absolute;

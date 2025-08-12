@@ -1283,17 +1283,36 @@
       weaponName.textContent = `Pickup ${closestWeapon.type}`;
       weaponStats.textContent = `${closestWeapon.damage} DMG | ${closestWeapon.range} RNG`;
       
-      // Position context menu near the weapon
-      const weaponScreenX = closestWeapon.x - cameraX;
-      const weaponScreenY = closestWeapon.y - cameraY;
+      // Position context menu near the weapon (convert world to screen coordinates)
+      const weaponScreenX = closestWeapon.x - (myPlayer.x - canvas.width / 2);
+      const weaponScreenY = closestWeapon.y - (myPlayer.y - canvas.height / 2);
       
       weaponContextMenu.style.left = (weaponScreenX + 40) + 'px';
       weaponContextMenu.style.top = (weaponScreenY - 20) + 'px';
       weaponContextMenu.classList.remove('hidden');
+      
+      // Add visual indicator on the weapon
+      closestWeapon.inRange = true;
     } else {
       weaponContextMenu.classList.add('hidden');
+      // Remove visual indicators from all weapons
+      weapons.forEach(weapon => {
+        weapon.inRange = false;
+      });
     }
   }
+
+  // Handle weapon pickup with E key
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'e' || e.key === 'E') {
+      if (nearbyWeapon) {
+        socket.emit('pickupWeapon', nearbyWeapon.id);
+        weaponContextMenu.classList.add('hidden');
+        nearbyWeapon = null;
+        addChatMessage('⚔️ Weapon picked up!');
+      }
+    }
+  });
 
   // Chat form submission
   chatForm.addEventListener('submit', (e) => {
@@ -1309,10 +1328,21 @@
     const div = document.createElement('div');
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('name');
-    nameSpan.textContent = data.name + ':';
+    
+    // Handle both string and object inputs
+    let name, message;
+    if (typeof data === 'string') {
+      name = 'System';
+      message = data;
+    } else {
+      name = data.name || 'Unknown';
+      message = data.message || '';
+    }
+    
+    nameSpan.textContent = name + ':';
     div.appendChild(nameSpan);
     const textSpan = document.createElement('span');
-    textSpan.textContent = ' ' + data.message;
+    textSpan.textContent = ' ' + message;
     div.appendChild(textSpan);
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -1322,16 +1352,16 @@
 
     // Show the message as a speech bubble above the sender's head
     if (data.id && players[data.id]) {
-      players[data.id].speech = data.message;
+      players[data.id].speech = message;
       players[data.id].speechExpire = Date.now() + 5000;
       
       // Add particles for chat messages - INCREASED BY 5X!
       createParticleBurst(players[data.id].x + 32, players[data.id].y, 15, '#4caf50');
-    } else {
+    } else if (typeof data === 'object' && data.id) {
       Object.keys(players).forEach((pid) => {
         const p = players[pid];
-        if (p.name === data.name) {
-          p.speech = data.message;
+        if (p.name === name) {
+          p.speech = message;
           p.speechExpire = Date.now() + 5000;
           createParticleBurst(p.x + 32, p.y, 15, '#4caf50');
         }
@@ -1487,16 +1517,33 @@
     // Draw weapons on the map
     weapons.forEach(weapon => {
       ctx.save();
+      
+      // Draw pickup range indicator if weapon is in range
+      if (weapon.inRange) {
+        ctx.beginPath();
+        ctx.arc(weapon.x, weapon.y, 40, 0, Math.PI * 2);
+        ctx.strokeStyle = '#4caf50';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      
       ctx.font = '20px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      // Draw weapon emoji
+      // Draw weapon emoji with glow effect if in range
+      if (weapon.inRange) {
+        ctx.shadowColor = '#4caf50';
+        ctx.shadowBlur = 10;
+      }
+      
       ctx.fillText(weapon.emoji, weapon.x, weapon.y);
       
       // Draw weapon name
       ctx.font = '12px Trebuchet MS';
-      ctx.fillStyle = '#ff69b4';
+      ctx.fillStyle = weapon.inRange ? '#4caf50' : '#ff69b4';
       ctx.fillText(weapon.type, weapon.x, weapon.y + 20);
       
       ctx.restore();
