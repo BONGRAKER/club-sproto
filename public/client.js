@@ -3,7 +3,7 @@
  *
  * This script handles the login flow, real‑time networking via socket.io,
  * drawing the game world onto a canvas, movement control, chat, avatar uploads,
- * mobile controls, background music, particle effects, and EMOTES!
+ * mobile controls, background music, particle effects, emotes, and INTERACTIVE FEATURES!
  */
 
 (() => {
@@ -53,6 +53,17 @@
   const alienBtn = document.getElementById('alienBtn');
   const ghostBtn = document.getElementById('ghostBtn');
   const ninjaBtn = document.getElementById('ninjaBtn');
+  
+  // Interactive elements
+  const weatherToggle = document.getElementById('weatherToggle');
+  const miniGameBtn = document.getElementById('miniGameBtn');
+  const dancePartyBtn = document.getElementById('dancePartyBtn');
+  const confettiBtn = document.getElementById('confettiBtn');
+  const miniGameOverlay = document.getElementById('miniGameOverlay');
+  const miniGameCanvas = document.getElementById('miniGameCanvas');
+  const miniGameScore = document.getElementById('miniGameScore');
+  const miniGameTime = document.getElementById('miniGameTime');
+  const closeMiniGame = document.getElementById('closeMiniGame');
 
   // Game state
   const avatars = [];
@@ -74,6 +85,17 @@
 
   // Mobile detection
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // Interactive features state
+  let weatherActive = false;
+  let dancePartyMode = false;
+  let weatherElements = [];
+  let confettiPieces = [];
+  let miniGameActive = false;
+  let miniGameScoreValue = 0;
+  let miniGameTimeLeft = 30;
+  let miniGameTargets = [];
+  let miniGameBullets = [];
 
   // Particle system for cool effects
   const particles = [];
@@ -219,6 +241,42 @@
     }
   }
 
+  class ConfettiPiece {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 10;
+      this.vy = (Math.random() - 0.5) * 10;
+      this.life = 1.0;
+      this.decay = 0.005;
+      this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+      this.size = Math.random() * 8 + 4;
+      this.rotation = Math.random() * Math.PI * 2;
+      this.rotationSpeed = (Math.random() - 0.5) * 0.2;
+    }
+    
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.2; // gravity
+      this.life -= this.decay;
+      this.rotation += this.rotationSpeed;
+    }
+    
+    draw(ctx) {
+      ctx.save();
+      ctx.globalAlpha = this.life;
+      ctx.fillStyle = this.color;
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      
+      // Draw confetti piece
+      ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+      
+      ctx.restore();
+    }
+  }
+
   // Initialize canvas scaling - FIXED FOR DESKTOP
   function initCanvasScaling() {
     const container = gameScreen;
@@ -322,7 +380,6 @@
     
     // Close panel when clicking outside
     document.addEventListener('click', (e) => {
-      const emoteControls = emotePanel.querySelectorAll('button');
       if (!emoteControls.contains(e.target)) {
         emotePanel.classList.remove('show');
         emoteToggle.classList.remove('active');
@@ -351,6 +408,203 @@
         emoteToggle.classList.remove('active');
       });
     });
+  }
+
+  // Initialize interactive features
+  function initInteractiveFeatures() {
+    // Weather toggle
+    weatherToggle.addEventListener('click', () => {
+      weatherActive = !weatherActive;
+      weatherToggle.classList.toggle('active');
+      
+      if (weatherActive) {
+        createWeatherEffect();
+      } else {
+        clearWeatherEffect();
+      }
+    });
+    
+    // Mini-game button
+    miniGameBtn.addEventListener('click', () => {
+      startMiniGame();
+    });
+    
+    // Dance party button
+    dancePartyBtn.addEventListener('click', () => {
+      dancePartyMode = !dancePartyMode;
+      dancePartyBtn.classList.toggle('active');
+      
+      if (dancePartyMode) {
+        // Make all players dance
+        Object.keys(players).forEach(id => {
+          if (players[id]) {
+            players[id].dancing = true;
+          }
+        });
+        addChatMessage({ id: 'system', name: 'System', message: '🎉 Dance party started!' });
+      } else {
+        // Stop dancing
+        Object.keys(players).forEach(id => {
+          if (players[id]) {
+            players[id].dancing = false;
+          }
+        });
+        addChatMessage({ id: 'system', name: 'System', message: '💤 Dance party ended!' });
+      }
+    });
+    
+    // Confetti button
+    confettiBtn.addEventListener('click', () => {
+      createConfettiStorm();
+    });
+    
+    // Close mini-game
+    closeMiniGame.addEventListener('click', () => {
+      stopMiniGame();
+    });
+  }
+
+  // Weather effects
+  function createWeatherEffect() {
+    const weatherType = Math.random() > 0.5 ? 'rain' : 'snow';
+    
+    for (let i = 0; i < 50; i++) {
+      const element = document.createElement('div');
+      element.className = weatherType;
+      element.style.left = Math.random() * 100 + '%';
+      element.style.animationDuration = (Math.random() * 2 + 1) + 's';
+      element.style.animationDelay = Math.random() * 2 + 's';
+      document.body.appendChild(element);
+      weatherElements.push(element);
+    }
+  }
+
+  function clearWeatherEffect() {
+    weatherElements.forEach(element => element.remove());
+    weatherElements.length = 0;
+  }
+
+  // Mini-game
+  function startMiniGame() {
+    miniGameActive = true;
+    miniGameScoreValue = 0;
+    miniGameTimeLeft = 30;
+    miniGameTargets.length = 0;
+    miniGameBullets.length = 0;
+    miniGameOverlay.classList.remove('hidden');
+    
+    // Create mini-game canvas
+    const mgCtx = miniGameCanvas.getContext('2d');
+    miniGameCanvas.width = 400;
+    miniGameCanvas.height = 300;
+    
+    // Game loop
+    const gameLoop = () => {
+      if (!miniGameActive) return;
+      
+      mgCtx.clearRect(0, 0, miniGameCanvas.width, miniGameCanvas.height);
+      
+      // Update and draw targets
+      for (let i = miniGameTargets.length - 1; i >= 0; i--) {
+        const target = miniGameTargets[i];
+        target.y += target.speed;
+        
+        mgCtx.fillStyle = target.color;
+        mgCtx.beginPath();
+        mgCtx.arc(target.x, target.y, target.radius, 0, Math.PI * 2);
+        mgCtx.fill();
+        
+        if (target.y > miniGameCanvas.height) {
+          miniGameTargets.splice(i, 1);
+        }
+      }
+      
+      // Update and draw bullets
+      for (let i = miniGameBullets.length - 1; i >= 0; i--) {
+        const bullet = miniGameBullets[i];
+        bullet.y -= bullet.speed;
+        
+        mgCtx.fillStyle = '#ff69b4';
+        mgCtx.beginPath();
+        mgCtx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+        mgCtx.fill();
+        
+        // Check collision with targets
+        for (let j = miniGameTargets.length - 1; j >= 0; j--) {
+          const target = miniGameTargets[j];
+          const distance = Math.sqrt((bullet.x - target.x) ** 2 + (bullet.y - target.y) ** 2);
+          
+          if (distance < target.radius + 3) {
+            miniGameTargets.splice(j, 1);
+            miniGameBullets.splice(i, 1);
+            miniGameScoreValue += 10;
+            miniGameScore.textContent = miniGameScoreValue;
+            break;
+          }
+        }
+        
+        if (bullet.y < 0) {
+          miniGameBullets.splice(i, 1);
+        }
+      }
+      
+      // Spawn new targets
+      if (Math.random() < 0.02) {
+        miniGameTargets.push({
+          x: Math.random() * miniGameCanvas.width,
+          y: -20,
+          radius: Math.random() * 10 + 10,
+          speed: Math.random() * 2 + 1,
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`
+        });
+      }
+      
+      requestAnimationFrame(gameLoop);
+    };
+    
+    gameLoop();
+    
+    // Click to shoot
+    miniGameCanvas.addEventListener('click', (e) => {
+      const rect = miniGameCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      miniGameBullets.push({
+        x: x,
+        y: miniGameCanvas.height,
+        speed: 5
+      });
+    });
+    
+    // Timer
+    const timer = setInterval(() => {
+      miniGameTimeLeft--;
+      miniGameTime.textContent = miniGameTimeLeft;
+      
+      if (miniGameTimeLeft <= 0) {
+        clearInterval(timer);
+        stopMiniGame();
+        alert(`Game Over! Final Score: ${miniGameScoreValue}`);
+      }
+    }, 1000);
+  }
+
+  function stopMiniGame() {
+    miniGameActive = false;
+    miniGameOverlay.classList.add('hidden');
+  }
+
+  // Confetti storm
+  function createConfettiStorm() {
+    for (let i = 0; i < 200; i++) {
+      confettiPieces.push(new ConfettiPiece(
+        Math.random() * window.innerWidth,
+        Math.random() * window.innerHeight
+      ));
+    }
+    
+    addChatMessage({ id: 'system', name: 'System', message: '🎊 Confetti storm!' });
   }
 
   // Create particle burst - INCREASED BY 5X!
@@ -693,6 +947,17 @@
       }
     }
     
+    // Update and draw confetti
+    for (let i = confettiPieces.length - 1; i >= 0; i--) {
+      confettiPieces[i].update();
+      confettiPieces[i].draw(ctx);
+      
+      // Remove dead confetti
+      if (confettiPieces[i].life <= 0) {
+        confettiPieces.splice(i, 1);
+      }
+    }
+    
     // Draw all players
     Object.keys(players).forEach((id) => {
       const p = players[id];
@@ -706,8 +971,15 @@
       ctx.textAlign = 'center';
       ctx.fillText(p.name, p.x + 32, p.y - 10);
       
-      // Draw avatar; scale to 64x64
+      // Draw avatar with dance animation if dancing
+      ctx.save();
+      if (p.dancing) {
+        ctx.translate(p.x + 32, p.y + 32);
+        ctx.rotate(Math.sin(Date.now() * 0.01) * 0.1);
+        ctx.translate(-(p.x + 32), -(p.y + 32));
+      }
       ctx.drawImage(img, p.x, p.y, 64, 64);
+      ctx.restore();
 
       // Draw speech bubble if player has a recent message
       if (p.speech && p.speechExpire && Date.now() < p.speechExpire) {
@@ -800,10 +1072,11 @@
 
   // Initialize the game
   loadAvatars().then(() => {
-    // Initialize music, mobile controls, and emote controls
+    // Initialize music, mobile controls, emote controls, and interactive features
     initMusic();
     initMobileControls();
     initEmoteControls();
+    initInteractiveFeatures();
     
     // Start the draw loop
     requestAnimationFrame(draw);

@@ -31,6 +31,28 @@
       <span id="playerCountText">0</span> players online
     </div>
 
+    <!-- Interactive features panel -->
+    <div id="interactivePanel" class="interactive-panel">
+      <button id="weatherToggle" class="interactive-btn" title="Toggle Weather Effects">🌤️</button>
+      <button id="miniGameBtn" class="interactive-btn" title="Start Mini-Game">🎮</button>
+      <button id="dancePartyBtn" class="interactive-btn" title="Dance Party Mode">🕺</button>
+      <button id="confettiBtn" class="interactive-btn" title="Confetti Storm">🎊</button>
+    </div>
+
+    <!-- Mini-game overlay -->
+    <div id="miniGameOverlay" class="mini-game-overlay hidden">
+      <div class="mini-game-panel">
+        <h2>🎯 Particle Shooter</h2>
+        <p>Click to shoot particles at the moving targets!</p>
+        <div id="miniGameCanvas" class="mini-game-canvas"></div>
+        <div class="mini-game-stats">
+          <span>Score: <span id="miniGameScore">0</span></span>
+          <span>Time: <span id="miniGameTime">30</span>s</span>
+        </div>
+        <button id="closeMiniGame" class="mini-game-btn">Close Game</button>
+      </div>
+    </div>
+
     <!-- Login screen -->
     <div id="login" class="overlay">
       <div class="login-panel">
