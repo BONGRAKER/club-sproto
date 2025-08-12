@@ -218,8 +218,8 @@ io.on('connection', (socket) => {
         break;
     }
     
-    // Broadcast movement to all other players
-    socket.broadcast.emit('playerMoved', {
+    // Broadcast movement to ALL players including the one who moved
+    io.emit('playerMoved', {
       id: socket.id,
       x: player.x,
       y: player.y
