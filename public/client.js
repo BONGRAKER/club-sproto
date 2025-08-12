@@ -2,7 +2,8 @@
  * Client‑side logic for Club Sproto.
  *
  * This script handles the login flow, real‑time networking via socket.io,
- * drawing the game world onto a canvas, movement control, chat, and avatar uploads.
+ * drawing the game world onto a canvas, movement control, chat, avatar uploads,
+ * mobile controls, and background music.
  */
 
 (() => {
@@ -24,6 +25,17 @@
   const avatarUpload = document.getElementById('avatarUpload');
   const uploadBtn = document.getElementById('uploadBtn');
   const uploadStatus = document.getElementById('uploadStatus');
+  
+  // Music elements
+  const bgMusic = document.getElementById('bgMusic');
+  const musicToggle = document.getElementById('musicToggle');
+  const volumeSlider = document.getElementById('volumeSlider');
+  
+  // Mobile control elements
+  const upBtn = document.getElementById('upBtn');
+  const downBtn = document.getElementById('downBtn');
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
 
   // Game state
   const avatars = [];
@@ -37,6 +49,99 @@
 
   // Track the selected avatar index
   let selectedAvatarIndex = 0;
+
+  // Canvas scaling for mobile
+  let canvasScale = 1;
+  let canvasOffsetX = 0;
+  let canvasOffsetY = 0;
+
+  // Mobile detection
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // Initialize canvas scaling
+  function initCanvasScaling() {
+    const container = gameScreen;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    
+    if (isMobile) {
+      // On mobile, make canvas fill available space
+      canvas.style.width = '100%';
+      canvas.style.height = '60vh';
+      canvasScale = Math.min(containerWidth / 1024, (containerHeight * 0.6) / 600);
+    } else {
+      // On desktop, maintain aspect ratio
+      canvasScale = Math.min(containerWidth / 1024, containerHeight / 600);
+    }
+    
+    canvasOffsetX = (containerWidth - 1024 * canvasScale) / 2;
+    canvasOffsetY = (containerHeight - 600 * canvasScale) / 2;
+  }
+
+  // Initialize music
+  function initMusic() {
+    // Set initial volume
+    bgMusic.volume = volumeSlider.value / 100;
+    
+    // Music toggle
+    musicToggle.addEventListener('click', () => {
+      if (bgMusic.paused) {
+        bgMusic.play().catch(e => console.log('Music play failed:', e));
+        musicToggle.classList.remove('muted');
+      } else {
+        bgMusic.pause();
+        musicToggle.classList.add('muted');
+      }
+    });
+    
+    // Volume control
+    volumeSlider.addEventListener('input', (e) => {
+      bgMusic.volume = e.target.value / 100;
+    });
+    
+    // Try to start music on first user interaction
+    document.addEventListener('click', () => {
+      if (bgMusic.paused) {
+        bgMusic.play().catch(e => console.log('Music play failed:', e));
+      }
+    }, { once: true });
+  }
+
+  // Initialize mobile controls
+  function initMobileControls() {
+    if (!isMobile) return;
+    
+    // Touch controls
+    const mobileButtons = [upBtn, downBtn, leftBtn, rightBtn];
+    const directions = ['up', 'down', 'left', 'right'];
+    
+    mobileButtons.forEach((btn, index) => {
+      const direction = directions[index];
+      
+      // Touch start
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        keys[direction] = true;
+      });
+      
+      // Touch end
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        keys[direction] = false;
+      });
+      
+      // Mouse events for testing on desktop
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        keys[direction] = true;
+      });
+      
+      btn.addEventListener('mouseup', (e) => {
+        e.preventDefault();
+        keys[direction] = false;
+      });
+    });
+  }
 
   // Load available avatars from server
   async function loadAvatars() {
@@ -163,6 +268,9 @@
     loginScreen.style.display = 'none';
     gameScreen.classList.remove('hidden');
     gameScreen.style.display = 'flex';
+    
+    // Initialize canvas scaling after game starts
+    setTimeout(initCanvasScaling, 100);
   });
 
   // Keyboard input for movement
@@ -177,10 +285,10 @@
   function handleMovement() {
     if (!myPlayer) return;
     const directions = [];
-    if (keys['ArrowLeft'] || keys['a']) directions.push('left');
-    if (keys['ArrowRight'] || keys['d']) directions.push('right');
-    if (keys['ArrowUp'] || keys['w']) directions.push('up');
-    if (keys['ArrowDown'] || keys['s']) directions.push('down');
+    if (keys['ArrowLeft'] || keys['a'] || keys['left']) directions.push('left');
+    if (keys['ArrowRight'] || keys['d'] || keys['right']) directions.push('right');
+    if (keys['ArrowUp'] || keys['w'] || keys['up']) directions.push('up');
+    if (keys['ArrowDown'] || keys['s'] || keys['down']) directions.push('down');
     if (directions.length > 0) {
       socket.emit('move', directions[0]);
     }
@@ -258,19 +366,28 @@
   // Main draw loop
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Apply canvas scaling
+    ctx.save();
+    ctx.scale(canvasScale, canvasScale);
+    ctx.translate(canvasOffsetX / canvasScale, canvasOffsetY / canvasScale);
+    
     // Draw background (centered to fill canvas)
     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+    
     // Draw all players
     Object.keys(players).forEach((id) => {
       const p = players[id];
       const avatarObj = avatars.find((a) => a.file === p.avatar);
       const img = avatarObj ? avatarObj.img : null;
       if (!img) return;
+      
       // Draw name above head
       ctx.font = '14px Trebuchet MS';
       ctx.fillStyle = '#ff69b4';
       ctx.textAlign = 'center';
       ctx.fillText(p.name, p.x + 32, p.y - 10);
+      
       // Draw avatar; scale to 64x64
       ctx.drawImage(img, p.x, p.y, 64, 64);
 
@@ -279,6 +396,9 @@
         drawSpeechBubble(p);
       }
     });
+    
+    ctx.restore();
+    
     // Movement is handled via discrete events but we continuously check keys
     handleMovement();
     requestAnimationFrame(draw);
@@ -326,8 +446,19 @@
     ctx.fillText(text, x + padding, y + height / 2);
   }
 
+  // Handle window resize
+  window.addEventListener('resize', () => {
+    if (gameScreen.style.display !== 'none') {
+      initCanvasScaling();
+    }
+  });
+
   // Initialize the game
   loadAvatars().then(() => {
+    // Initialize music and mobile controls
+    initMusic();
+    initMobileControls();
+    
     // Start the draw loop
     requestAnimationFrame(draw);
   });

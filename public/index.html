@@ -2,13 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Club Sproto</title>
     <link rel="stylesheet" href="style.css" />
     <!-- Load Socket.io client -->
     <script src="/socket.io/socket.io.js"></script>
   </head>
   <body>
+    <!-- Background music -->
+    <audio id="bgMusic" loop>
+      <source src="music/background-music.mp3" type="audio/mpeg">
+      <source src="music/background-music.ogg" type="audio/ogg">
+    </audio>
+    
+    <!-- Music controls -->
+    <div id="musicControls" class="music-controls">
+      <button id="musicToggle" class="music-btn">🎵</button>
+      <div class="volume-slider">
+        <input type="range" id="volumeSlider" min="0" max="100" value="50">
+      </div>
+    </div>
+
     <!-- Login screen -->
     <div id="login" class="overlay">
       <div class="login-panel">
@@ -34,10 +51,24 @@
     <!-- Game container -->
     <div id="game" class="hidden">
       <canvas id="gameCanvas" width="1024" height="600"></canvas>
+      
+      <!-- Mobile controls -->
+      <div id="mobileControls" class="mobile-controls">
+        <div class="control-row">
+          <button id="upBtn" class="control-btn">⬆️</button>
+        </div>
+        <div class="control-row">
+          <button id="leftBtn" class="control-btn">⬅️</button>
+          <button id="downBtn" class="control-btn">⬇️</button>
+          <button id="rightBtn" class="control-btn">➡️</button>
+        </div>
+      </div>
+      
       <div id="chatContainer">
         <div id="chatMessages"></div>
         <form id="chatForm">
           <input id="chatInput" type="text" autocomplete="off" placeholder="Type a message…" />
+          <button type="submit" id="chatSendBtn">Send</button>
         </form>
       </div>
     </div>
