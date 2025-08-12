@@ -104,6 +104,43 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+/* Emote controls */
+.emote-controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 200px;
+}
+
+.emote-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(27, 27, 58, 0.9);
+  border: 2px solid #ff69b4;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.emote-btn:hover {
+  background: #ff69b4;
+  transform: scale(1.1);
+}
+
+.emote-btn:active {
+  transform: scale(0.95);
+}
+
 /* Overlay covering entire screen for login */
 .overlay {
   position: absolute;
@@ -292,8 +329,8 @@ body {
 #gameCanvas {
   background: #000;
   flex: 1;
-  max-width: calc(100vw - 300px);
-  max-height: 100vh;
+  height: 100vh;
+  width: calc(100vw - 300px);
   object-fit: contain;
 }
 
@@ -463,6 +500,18 @@ body {
     padding: 6px 12px;
     font-size: 0.8rem;
   }
+  
+  .emote-controls {
+    bottom: 10px;
+    right: 10px;
+    gap: 6px;
+  }
+  
+  .emote-btn {
+    width: 35px;
+    height: 35px;
+    font-size: 18px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -498,12 +547,27 @@ body {
   50% { transform: translateY(-10px); }
 }
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px); }
+  60% { transform: translateY(-5px); }
+}
+
 .login-panel h1 {
   animation: pulse 2s infinite;
 }
 
 .player-count {
   animation: float 3s ease-in-out infinite;
+}
+
+.emote-btn:hover {
+  animation: bounce 0.6s ease-in-out;
 }
 
 /* Scrollbar styling */

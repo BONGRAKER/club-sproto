@@ -178,6 +178,18 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Handle emote events. Broadcast to everyone including sender.
+  socket.on('emote', (data) => {
+    const player = players[socket.id];
+    if (!player) return;
+    io.emit('emote', {
+      id: socket.id,
+      emote: data.emote,
+      x: data.x,
+      y: data.y,
+    });
+  });
+
   // Handle disconnects. Remove the player and notify others.
   socket.on('disconnect', () => {
     console.log('user disconnected', socket.id);

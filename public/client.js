@@ -3,7 +3,7 @@
  *
  * This script handles the login flow, real‑time networking via socket.io,
  * drawing the game world onto a canvas, movement control, chat, avatar uploads,
- * mobile controls, background music, and particle effects.
+ * mobile controls, background music, particle effects, and EMOTES!
  */
 
 (() => {
@@ -37,6 +37,16 @@
   const downBtn = document.getElementById('downBtn');
   const leftBtn = document.getElementById('leftBtn');
   const rightBtn = document.getElementById('rightBtn');
+  
+  // Emote elements
+  const waveBtn = document.getElementById('waveBtn');
+  const danceBtn = document.getElementById('danceBtn');
+  const laughBtn = document.getElementById('laughBtn');
+  const heartBtn = document.getElementById('heartBtn');
+  const fireBtn = document.getElementById('fireBtn');
+  const rainbowBtn = document.getElementById('rainbowBtn');
+  const starBtn = document.getElementById('starBtn');
+  const rocketBtn = document.getElementById('rocketBtn');
 
   // Game state
   const avatars = [];
@@ -62,8 +72,20 @@
   // Particle system for cool effects
   const particles = [];
   
+  // Emote system
+  const emotes = {
+    '👋': { color: '#4a90e2', particles: 8, duration: 3000 },
+    '💃': { color: '#ff69b4', particles: 15, duration: 4000 },
+    '😂': { color: '#ffd700', particles: 12, duration: 3000 },
+    '❤️': { color: '#ff4444', particles: 10, duration: 3500 },
+    '🔥': { color: '#ff6b35', particles: 20, duration: 4000 },
+    '🌈': { color: '#ff69b4', particles: 25, duration: 5000 },
+    '⭐': { color: '#ffd700', particles: 6, duration: 3000 },
+    '🚀': { color: '#ff6b35', particles: 18, duration: 4000 }
+  };
+  
   class Particle {
-    constructor(x, y, color = '#ff69b4') {
+    constructor(x, y, color = '#ff69b4', type = 'normal') {
       this.x = x;
       this.y = y;
       this.vx = (Math.random() - 0.5) * 4;
@@ -72,6 +94,9 @@
       this.decay = 0.02;
       this.color = color;
       this.size = Math.random() * 3 + 1;
+      this.type = type;
+      this.rotation = Math.random() * Math.PI * 2;
+      this.rotationSpeed = (Math.random() - 0.5) * 0.2;
     }
     
     update() {
@@ -79,20 +104,55 @@
       this.y += this.vy;
       this.life -= this.decay;
       this.vy += 0.1; // gravity
+      this.rotation += this.rotationSpeed;
+      
+      // Special effects for different particle types
+      if (this.type === 'fire') {
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+      } else if (this.type === 'rainbow') {
+        this.color = `hsl(${(Date.now() * 0.1) % 360}, 70%, 60%)`;
+      }
     }
     
     draw(ctx) {
       ctx.save();
       ctx.globalAlpha = this.life;
       ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      
+      if (this.type === 'star') {
+        // Draw star shape
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const angle = (i * Math.PI * 2) / 5 - Math.PI / 2;
+          const x = Math.cos(angle) * this.size;
+          const y = Math.sin(angle) * this.size;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else if (this.type === 'heart') {
+        // Draw heart shape
+        ctx.beginPath();
+        ctx.moveTo(0, this.size);
+        ctx.bezierCurveTo(-this.size, -this.size, -this.size * 2, this.size, 0, this.size * 2);
+        ctx.bezierCurveTo(this.size * 2, this.size, this.size, -this.size, 0, this.size);
+        ctx.fill();
+      } else {
+        // Draw circle
+        ctx.beginPath();
+        ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
       ctx.restore();
     }
   }
 
-  // Initialize canvas scaling
+  // Initialize canvas scaling - FIXED FOR DESKTOP
   function initCanvasScaling() {
     const container = gameScreen;
     const containerWidth = container.clientWidth;
@@ -104,12 +164,20 @@
       canvas.style.height = '60vh';
       canvasScale = Math.min(containerWidth / 1024, (containerHeight * 0.6) / 600);
     } else {
-      // On desktop, maintain aspect ratio
-      canvasScale = Math.min(containerWidth / 1024, containerHeight / 600);
+      // On desktop, maintain aspect ratio and fit properly
+      const chatWidth = 300; // Chat container width
+      const availableWidth = containerWidth - chatWidth;
+      const availableHeight = containerHeight;
+      
+      canvasScale = Math.min(availableWidth / 1024, availableHeight / 600);
+      
+      // Set canvas size to maintain aspect ratio
+      canvas.style.width = (1024 * canvasScale) + 'px';
+      canvas.style.height = (600 * canvasScale) + 'px';
     }
     
-    canvasOffsetX = (containerWidth - 1024 * canvasScale) / 2;
-    canvasOffsetY = (containerHeight - 600 * canvasScale) / 2;
+    canvasOffsetX = 0;
+    canvasOffsetY = 0;
   }
 
   // Initialize music
@@ -177,10 +245,48 @@
     });
   }
 
+  // Initialize emote controls
+  function initEmoteControls() {
+    const emoteButtons = [waveBtn, danceBtn, laughBtn, heartBtn, fireBtn, rainbowBtn, starBtn, rocketBtn];
+    const emoteSymbols = ['👋', '💃', '😂', '❤️', '🔥', '🌈', '⭐', '🚀'];
+    
+    emoteButtons.forEach((btn, index) => {
+      btn.addEventListener('click', () => {
+        const emote = emoteSymbols[index];
+        const emoteData = emotes[emote];
+        
+        // Send emote to server
+        socket.emit('emote', { emote, x: myPlayer?.x || 512, y: myPlayer?.y || 300 });
+        
+        // Create local particle effect
+        createEmoteParticles(myPlayer?.x || 512, myPlayer?.y || 300, emote);
+        
+        // Add emote to chat
+        addChatMessage({ id: myId, name: myPlayer?.name || 'You', message: emote });
+      });
+    });
+  }
+
   // Create particle burst
   function createParticleBurst(x, y, count = 10, color = '#ff69b4') {
     for (let i = 0; i < count; i++) {
       particles.push(new Particle(x, y, color));
+    }
+  }
+
+  // Create emote particles
+  function createEmoteParticles(x, y, emote) {
+    const emoteData = emotes[emote];
+    if (!emoteData) return;
+    
+    for (let i = 0; i < emoteData.particles; i++) {
+      let particleType = 'normal';
+      if (emote === '⭐') particleType = 'star';
+      else if (emote === '❤️') particleType = 'heart';
+      else if (emote === '🔥') particleType = 'fire';
+      else if (emote === '🌈') particleType = 'rainbow';
+      
+      particles.push(new Particle(x, y, emoteData.color, particleType));
     }
   }
 
@@ -193,6 +299,18 @@
     if (count > 0 && count % 5 === 0) {
       createParticleBurst(Math.random() * 1024, Math.random() * 600, 5, '#4a90e2');
     }
+  }
+
+  // Random fun events
+  function triggerRandomEvent() {
+    const events = [
+      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 20, '#ffd700'), // Gold burst
+      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 15, '#ff69b4'), // Pink burst
+      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 12, '#4a90e2'), // Blue burst
+    ];
+    
+    const randomEvent = events[Math.floor(Math.random() * events.length)];
+    randomEvent();
   }
 
   // Load available avatars from server
@@ -433,14 +551,17 @@
     addChatMessage(data);
   });
 
+  socket.on('emote', (data) => {
+    if (data.id && players[data.id]) {
+      players[data.id].emote = data.emote;
+      players[data.id].emoteExpire = Date.now() + 3000;
+      createEmoteParticles(data.x, data.y, data.emote);
+    }
+  });
+
   // Main draw loop
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Apply canvas scaling
-    ctx.save();
-    ctx.scale(canvasScale, canvasScale);
-    ctx.translate(canvasOffsetX / canvasScale, canvasOffsetY / canvasScale);
     
     // Draw background (centered to fill canvas)
     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
@@ -476,9 +597,12 @@
       if (p.speech && p.speechExpire && Date.now() < p.speechExpire) {
         drawSpeechBubble(p);
       }
+      
+      // Draw emote if player has a recent emote
+      if (p.emote && p.emoteExpire && Date.now() < p.emoteExpire) {
+        drawEmote(p);
+      }
     });
-    
-    ctx.restore();
     
     // Movement is handled via discrete events but we continuously check keys
     handleMovement();
@@ -527,6 +651,27 @@
     ctx.fillText(text, x + padding, y + height / 2);
   }
 
+  /**
+   * Draw an emote above a player's head
+   * @param {Object} p Player object with x, y, emote, emoteExpire
+   */
+  function drawEmote(p) {
+    const emote = p.emote;
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Add some animation
+    const timeLeft = p.emoteExpire - Date.now();
+    const alpha = Math.min(1, timeLeft / 1000);
+    ctx.globalAlpha = alpha;
+    
+    // Draw emote above player
+    ctx.fillText(emote, p.x + 32, p.y - 50);
+    
+    ctx.globalAlpha = 1;
+  }
+
   // Handle window resize
   window.addEventListener('resize', () => {
     if (gameScreen.style.display !== 'none') {
@@ -534,11 +679,15 @@
     }
   });
 
+  // Random events every 30 seconds
+  setInterval(triggerRandomEvent, 30000);
+
   // Initialize the game
   loadAvatars().then(() => {
-    // Initialize music and mobile controls
+    // Initialize music, mobile controls, and emote controls
     initMusic();
     initMobileControls();
+    initEmoteControls();
     
     // Start the draw loop
     requestAnimationFrame(draw);
