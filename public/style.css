@@ -104,23 +104,69 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Emote controls */
+/* Emote controls - CENTERED AND DROPDOWN */
 .emote-controls {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1000;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
+}
+
+.emote-toggle {
+  width: 50px;
+  height: 50px;
+  background: rgba(27, 27, 58, 0.9);
+  border: 2px solid #ff69b4;
+  border-radius: 50%;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1001;
+}
+
+.emote-toggle:hover {
+  background: #ff69b4;
+  transform: scale(1.1);
+}
+
+.emote-toggle.active {
+  background: #ff69b4;
+  transform: rotate(180deg);
+}
+
+.emote-panel {
+  background: rgba(27, 27, 58, 0.95);
+  border: 2px solid #ff69b4;
+  border-radius: 12px;
+  padding: 12px;
+  display: none;
   flex-wrap: wrap;
-  max-width: 200px;
+  gap: 8px;
+  max-width: 300px;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.emote-panel.show {
+  display: flex;
+  animation: slideUp 0.3s ease-out;
 }
 
 .emote-btn {
   width: 40px;
   height: 40px;
-  background: rgba(27, 27, 58, 0.9);
-  border: 2px solid #ff69b4;
+  background: rgba(31, 31, 69, 0.8);
+  border: 1px solid #ff69b4;
   border-radius: 50%;
   font-size: 20px;
   cursor: pointer;
@@ -129,7 +175,6 @@ body {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .emote-btn:hover {
@@ -503,8 +548,17 @@ body {
   
   .emote-controls {
     bottom: 10px;
-    right: 10px;
-    gap: 6px;
+  }
+  
+  .emote-toggle {
+    width: 45px;
+    height: 45px;
+    font-size: 20px;
+  }
+  
+  .emote-panel {
+    max-width: 250px;
+    padding: 10px;
   }
   
   .emote-btn {
@@ -558,6 +612,22 @@ body {
   60% { transform: translateY(-5px); }
 }
 
+@keyframes slideUp {
+  0% { 
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  100% { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
 .login-panel h1 {
   animation: pulse 2s infinite;
 }
@@ -568,6 +638,13 @@ body {
 
 .emote-btn:hover {
   animation: bounce 0.6s ease-in-out;
+}
+
+/* Sparkle effect */
+.sparkle {
+  position: absolute;
+  pointer-events: none;
+  animation: sparkle 1s ease-in-out;
 }
 
 /* Scrollbar styling */

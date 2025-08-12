@@ -39,6 +39,8 @@
   const rightBtn = document.getElementById('rightBtn');
   
   // Emote elements
+  const emoteToggle = document.getElementById('emoteToggle');
+  const emotePanel = document.getElementById('emotePanel');
   const waveBtn = document.getElementById('waveBtn');
   const danceBtn = document.getElementById('danceBtn');
   const laughBtn = document.getElementById('laughBtn');
@@ -47,6 +49,10 @@
   const rainbowBtn = document.getElementById('rainbowBtn');
   const starBtn = document.getElementById('starBtn');
   const rocketBtn = document.getElementById('rocketBtn');
+  const poopBtn = document.getElementById('poopBtn');
+  const alienBtn = document.getElementById('alienBtn');
+  const ghostBtn = document.getElementById('ghostBtn');
+  const ninjaBtn = document.getElementById('ninjaBtn');
 
   // Game state
   const avatars = [];
@@ -71,47 +77,57 @@
 
   // Particle system for cool effects
   const particles = [];
+  const sparkles = [];
   
-  // Emote system
+  // Emote system - INCREASED BY 5X!
   const emotes = {
-    '👋': { color: '#4a90e2', particles: 8, duration: 3000 },
-    '💃': { color: '#ff69b4', particles: 15, duration: 4000 },
-    '😂': { color: '#ffd700', particles: 12, duration: 3000 },
-    '❤️': { color: '#ff4444', particles: 10, duration: 3500 },
-    '🔥': { color: '#ff6b35', particles: 20, duration: 4000 },
-    '🌈': { color: '#ff69b4', particles: 25, duration: 5000 },
-    '⭐': { color: '#ffd700', particles: 6, duration: 3000 },
-    '🚀': { color: '#ff6b35', particles: 18, duration: 4000 }
+    '👋': { color: '#4a90e2', particles: 40, duration: 3000 },
+    '💃': { color: '#ff69b4', particles: 75, duration: 4000 },
+    '😂': { color: '#ffd700', particles: 60, duration: 3000 },
+    '❤️': { color: '#ff4444', particles: 50, duration: 3500 },
+    '🔥': { color: '#ff6b35', particles: 100, duration: 4000 },
+    '🌈': { color: '#ff69b4', particles: 125, duration: 5000 },
+    '⭐': { color: '#ffd700', particles: 30, duration: 3000 },
+    '🚀': { color: '#ff6b35', particles: 90, duration: 4000 },
+    '💩': { color: '#8B4513', particles: 45, duration: 3000 },
+    '👽': { color: '#00ff00', particles: 80, duration: 4000 },
+    '👻': { color: '#f0f8ff', particles: 70, duration: 3500 },
+    '🥷': { color: '#000000', particles: 65, duration: 3000 }
   };
   
   class Particle {
     constructor(x, y, color = '#ff69b4', type = 'normal') {
       this.x = x;
       this.y = y;
-      this.vx = (Math.random() - 0.5) * 4;
-      this.vy = (Math.random() - 0.5) * 4;
+      this.vx = (Math.random() - 0.5) * 8; // Increased speed
+      this.vy = (Math.random() - 0.5) * 8;
       this.life = 1.0;
-      this.decay = 0.02;
+      this.decay = 0.01; // Slower decay for longer particles
       this.color = color;
-      this.size = Math.random() * 3 + 1;
+      this.size = Math.random() * 4 + 2; // Bigger particles
       this.type = type;
       this.rotation = Math.random() * Math.PI * 2;
-      this.rotationSpeed = (Math.random() - 0.5) * 0.2;
+      this.rotationSpeed = (Math.random() - 0.5) * 0.4; // Faster rotation
     }
     
     update() {
       this.x += this.vx;
       this.y += this.vy;
       this.life -= this.decay;
-      this.vy += 0.1; // gravity
+      this.vy += 0.05; // Reduced gravity
       this.rotation += this.rotationSpeed;
       
       // Special effects for different particle types
       if (this.type === 'fire') {
-        this.vx *= 0.98;
-        this.vy *= 0.98;
+        this.vx *= 0.99;
+        this.vy *= 0.99;
+        this.color = `hsl(${Math.random() * 60 + 10}, 100%, 50%)`; // Random fire colors
       } else if (this.type === 'rainbow') {
-        this.color = `hsl(${(Date.now() * 0.1) % 360}, 70%, 60%)`;
+        this.color = `hsl(${(Date.now() * 0.2) % 360}, 70%, 60%)`;
+      } else if (this.type === 'alien') {
+        this.color = `hsl(${Math.random() * 60 + 120}, 100%, 50%)`; // Green variations
+      } else if (this.type === 'ghost') {
+        this.color = `hsl(0, 0%, ${Math.random() * 30 + 70}%)`; // White variations
       }
     }
     
@@ -141,12 +157,63 @@
         ctx.bezierCurveTo(-this.size, -this.size, -this.size * 2, this.size, 0, this.size * 2);
         ctx.bezierCurveTo(this.size * 2, this.size, this.size, -this.size, 0, this.size);
         ctx.fill();
+      } else if (this.type === 'poop') {
+        // Draw poop emoji shape
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.size, this.size * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Add eyes
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(-this.size * 0.3, -this.size * 0.2, 2, 0, Math.PI * 2);
+        ctx.arc(this.size * 0.3, -this.size * 0.2, 2, 0, Math.PI * 2);
+        ctx.fill();
       } else {
         // Draw circle
         ctx.beginPath();
         ctx.arc(0, 0, this.size, 0, Math.PI * 2);
         ctx.fill();
       }
+      
+      ctx.restore();
+    }
+  }
+
+  class Sparkle {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.life = 1.0;
+      this.decay = 0.02;
+      this.size = Math.random() * 3 + 1;
+      this.rotation = Math.random() * Math.PI * 2;
+      this.rotationSpeed = (Math.random() - 0.5) * 0.3;
+    }
+    
+    update() {
+      this.life -= this.decay;
+      this.rotation += this.rotationSpeed;
+    }
+    
+    draw(ctx) {
+      ctx.save();
+      ctx.globalAlpha = this.life;
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      
+      // Draw sparkle
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI) / 2;
+        const x = Math.cos(angle) * this.size;
+        const y = Math.sin(angle) * this.size;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
       
       ctx.restore();
     }
@@ -245,10 +312,25 @@
     });
   }
 
-  // Initialize emote controls
+  // Initialize emote controls with dropdown
   function initEmoteControls() {
-    const emoteButtons = [waveBtn, danceBtn, laughBtn, heartBtn, fireBtn, rainbowBtn, starBtn, rocketBtn];
-    const emoteSymbols = ['👋', '💃', '😂', '❤️', '🔥', '🌈', '⭐', '🚀'];
+    // Toggle emote panel
+    emoteToggle.addEventListener('click', () => {
+      emotePanel.classList.toggle('show');
+      emoteToggle.classList.toggle('active');
+    });
+    
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+      const emoteControls = emotePanel.querySelectorAll('button');
+      if (!emoteControls.contains(e.target)) {
+        emotePanel.classList.remove('show');
+        emoteToggle.classList.remove('active');
+      }
+    });
+    
+    const emoteButtons = [waveBtn, danceBtn, laughBtn, heartBtn, fireBtn, rainbowBtn, starBtn, rocketBtn, poopBtn, alienBtn, ghostBtn, ninjaBtn];
+    const emoteSymbols = ['👋', '💃', '😂', '❤️', '🔥', '🌈', '⭐', '🚀', '💩', '👽', '👻', '🥷'];
     
     emoteButtons.forEach((btn, index) => {
       btn.addEventListener('click', () => {
@@ -263,18 +345,22 @@
         
         // Add emote to chat
         addChatMessage({ id: myId, name: myPlayer?.name || 'You', message: emote });
+        
+        // Close panel after emote
+        emotePanel.classList.remove('show');
+        emoteToggle.classList.remove('active');
       });
     });
   }
 
-  // Create particle burst
-  function createParticleBurst(x, y, count = 10, color = '#ff69b4') {
+  // Create particle burst - INCREASED BY 5X!
+  function createParticleBurst(x, y, count = 50, color = '#ff69b4') {
     for (let i = 0; i < count; i++) {
       particles.push(new Particle(x, y, color));
     }
   }
 
-  // Create emote particles
+  // Create emote particles - INCREASED BY 5X!
   function createEmoteParticles(x, y, emote) {
     const emoteData = emotes[emote];
     if (!emoteData) return;
@@ -285,8 +371,18 @@
       else if (emote === '❤️') particleType = 'heart';
       else if (emote === '🔥') particleType = 'fire';
       else if (emote === '🌈') particleType = 'rainbow';
+      else if (emote === '💩') particleType = 'poop';
+      else if (emote === '👽') particleType = 'alien';
+      else if (emote === '👻') particleType = 'ghost';
       
       particles.push(new Particle(x, y, emoteData.color, particleType));
+    }
+  }
+
+  // Create sparkles
+  function createSparkles(x, y, count = 10) {
+    for (let i = 0; i < count; i++) {
+      sparkles.push(new Sparkle(x + (Math.random() - 0.5) * 100, y + (Math.random() - 0.5) * 100));
     }
   }
 
@@ -297,16 +393,25 @@
     
     // Add some particles when players join/leave
     if (count > 0 && count % 5 === 0) {
-      createParticleBurst(Math.random() * 1024, Math.random() * 600, 5, '#4a90e2');
+      createParticleBurst(Math.random() * 1024, Math.random() * 600, 25, '#4a90e2');
     }
   }
 
-  // Random fun events
+  // Random fun events - INCREASED BY 5X!
   function triggerRandomEvent() {
     const events = [
-      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 20, '#ffd700'), // Gold burst
-      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 15, '#ff69b4'), // Pink burst
-      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 12, '#4a90e2'), // Blue burst
+      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 100, '#ffd700'), // Gold burst
+      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 75, '#ff69b4'), // Pink burst
+      () => createParticleBurst(Math.random() * 1024, Math.random() * 600, 60, '#4a90e2'), // Blue burst
+      () => createSparkles(Math.random() * 1024, Math.random() * 600, 50), // Sparkle storm
+      () => {
+        // Multi-color explosion
+        for (let i = 0; i < 5; i++) {
+          setTimeout(() => {
+            createParticleBurst(Math.random() * 1024, Math.random() * 600, 40, `hsl(${Math.random() * 360}, 70%, 60%)`);
+          }, i * 200);
+        }
+      }
     ];
     
     const randomEvent = events[Math.floor(Math.random() * events.length)];
@@ -491,15 +596,15 @@
       players[data.id].speech = data.message;
       players[data.id].speechExpire = Date.now() + 5000;
       
-      // Add particles for chat messages
-      createParticleBurst(players[data.id].x + 32, players[data.id].y, 3, '#4caf50');
+      // Add particles for chat messages - INCREASED BY 5X!
+      createParticleBurst(players[data.id].x + 32, players[data.id].y, 15, '#4caf50');
     } else {
       Object.keys(players).forEach((pid) => {
         const p = players[pid];
         if (p.name === data.name) {
           p.speech = data.message;
           p.speechExpire = Date.now() + 5000;
-          createParticleBurst(p.x + 32, p.y, 3, '#4caf50');
+          createParticleBurst(p.x + 32, p.y, 15, '#4caf50');
         }
       });
     }
@@ -519,22 +624,22 @@
     players[myId] = data;
     updatePlayerCount();
     
-    // Welcome particle burst
-    createParticleBurst(data.x + 32, data.y, 15, '#ff69b4');
+    // Welcome particle burst - INCREASED BY 5X!
+    createParticleBurst(data.x + 32, data.y, 75, '#ff69b4');
   });
 
   socket.on('playerJoined', (data) => {
     players[data.id] = data.player;
     updatePlayerCount();
     
-    // Welcome particles for new players
-    createParticleBurst(data.player.x + 32, data.player.y, 10, '#4a90e2');
+    // Welcome particles for new players - INCREASED BY 5X!
+    createParticleBurst(data.player.x + 32, data.player.y, 50, '#4a90e2');
   });
 
   socket.on('playerLeft', (playerId) => {
     if (players[playerId]) {
-      // Farewell particles
-      createParticleBurst(players[playerId].x + 32, players[playerId].y, 8, '#f44336');
+      // Farewell particles - INCREASED BY 5X!
+      createParticleBurst(players[playerId].x + 32, players[playerId].y, 40, '#f44336');
     }
     delete players[playerId];
     updatePlayerCount();
@@ -566,7 +671,7 @@
     // Draw background (centered to fill canvas)
     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
     
-    // Update and draw particles
+    // Update and draw particles - INCREASED BY 5X!
     for (let i = particles.length - 1; i >= 0; i--) {
       particles[i].update();
       particles[i].draw(ctx);
@@ -574,6 +679,17 @@
       // Remove dead particles
       if (particles[i].life <= 0) {
         particles.splice(i, 1);
+      }
+    }
+    
+    // Update and draw sparkles
+    for (let i = sparkles.length - 1; i >= 0; i--) {
+      sparkles[i].update();
+      sparkles[i].draw(ctx);
+      
+      // Remove dead sparkles
+      if (sparkles[i].life <= 0) {
+        sparkles.splice(i, 1);
       }
     }
     
@@ -679,8 +795,8 @@
     }
   });
 
-  // Random events every 30 seconds
-  setInterval(triggerRandomEvent, 30000);
+  // Random events every 20 seconds - MORE FREQUENT!
+  setInterval(triggerRandomEvent, 20000);
 
   // Initialize the game
   loadAvatars().then(() => {
