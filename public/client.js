@@ -9,6 +9,15 @@
 (() => {
   // Establish Socket.io connection
   const socket = io();
+  
+  // Debug socket connection
+  socket.on('connect', () => {
+    console.log('Connected to server with ID:', socket.id);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Disconnected from server');
+  });
 
   // DOM elements
   const loginScreen = document.getElementById('login');
@@ -1141,6 +1150,7 @@
   // Keyboard input for movement
   const keys = {};
   window.addEventListener('keydown', (e) => {
+    console.log('Key down:', e.key);
     keys[e.key] = true;
     
     // Prevent default for movement keys to avoid page scrolling
@@ -1149,13 +1159,20 @@
     }
   });
   window.addEventListener('keyup', (e) => {
+    console.log('Key up:', e.key);
     keys[e.key] = false;
   });
 
   function handleMovement() {
-    if (!myPlayer) return;
+    if (!myPlayer) {
+      console.log('No myPlayer yet');
+      return;
+    }
     
-    if (myPlayer.isDead) return;
+    if (myPlayer.isDead) {
+      console.log('Player is dead, can\'t move');
+      return;
+    }
     
     const directions = [];
     if (keys['ArrowLeft'] || keys['a'] || keys['A']) directions.push('left');
@@ -1164,6 +1181,7 @@
     if (keys['ArrowDown'] || keys['s'] || keys['S']) directions.push('down');
     
     if (directions.length > 0) {
+      console.log('Moving:', directions[0], 'Player pos:', myPlayer.x, myPlayer.y);
       socket.emit('move', directions[0]);
     }
     
@@ -1233,6 +1251,7 @@
   });
 
   socket.on('playerData', (data) => {
+    console.log('Received player data:', data);
     myId = socket.id;
     myPlayer = data;
     players[myId] = data;
@@ -1260,6 +1279,7 @@
   });
 
   socket.on('playerMoved', (data) => {
+    console.log('Player moved:', data);
     if (players[data.id]) {
       players[data.id].x = data.x;
       players[data.id].y = data.y;
