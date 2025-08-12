@@ -426,7 +426,9 @@
     
     // Mini-game button
     miniGameBtn.addEventListener('click', () => {
-      startMiniGame();
+      if (!miniGameActive) {
+        startMiniGame();
+      }
     });
     
     // Dance party button
@@ -462,6 +464,20 @@
     closeMiniGame.addEventListener('click', () => {
       stopMiniGame();
     });
+    
+    // Close mini-game when clicking outside
+    miniGameOverlay.addEventListener('click', (e) => {
+      if (e.target === miniGameOverlay) {
+        stopMiniGame();
+      }
+    });
+    
+    // Close mini-game with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && miniGameActive) {
+        stopMiniGame();
+      }
+    });
   }
 
   // Weather effects
@@ -493,28 +509,67 @@
     miniGameBullets.length = 0;
     miniGameOverlay.classList.remove('hidden');
     
+    // Reset score and time display
+    miniGameScore.textContent = miniGameScoreValue;
+    miniGameTime.textContent = miniGameTimeLeft;
+    
     // Create mini-game canvas
     const mgCtx = miniGameCanvas.getContext('2d');
     miniGameCanvas.width = 400;
     miniGameCanvas.height = 300;
     
+    // Clear canvas
+    mgCtx.clearRect(0, 0, miniGameCanvas.width, miniGameCanvas.height);
+    
+    // Draw background
+    mgCtx.fillStyle = '#1b1b3a';
+    mgCtx.fillRect(0, 0, miniGameCanvas.width, miniGameCanvas.height);
+    
+    // Draw border
+    mgCtx.strokeStyle = '#ff69b4';
+    mgCtx.lineWidth = 2;
+    mgCtx.strokeRect(0, 0, miniGameCanvas.width, miniGameCanvas.height);
+    
+    // Draw instructions
+    mgCtx.fillStyle = '#ff69b4';
+    mgCtx.font = '16px Trebuchet MS';
+    mgCtx.textAlign = 'center';
+    mgCtx.fillText('Click to shoot! Hit the targets!', miniGameCanvas.width / 2, 30);
+    
+    let gameTimer;
+    let gameLoop;
+    
     // Game loop
-    const gameLoop = () => {
+    gameLoop = () => {
       if (!miniGameActive) return;
       
       mgCtx.clearRect(0, 0, miniGameCanvas.width, miniGameCanvas.height);
+      
+      // Draw background
+      mgCtx.fillStyle = '#1b1b3a';
+      mgCtx.fillRect(0, 0, miniGameCanvas.width, miniGameCanvas.height);
+      
+      // Draw border
+      mgCtx.strokeStyle = '#ff69b4';
+      mgCtx.lineWidth = 2;
+      mgCtx.strokeRect(0, 0, miniGameCanvas.width, miniGameCanvas.height);
       
       // Update and draw targets
       for (let i = miniGameTargets.length - 1; i >= 0; i--) {
         const target = miniGameTargets[i];
         target.y += target.speed;
         
+        // Draw target with glow effect
+        mgCtx.shadowColor = target.color;
+        mgCtx.shadowBlur = 10;
         mgCtx.fillStyle = target.color;
         mgCtx.beginPath();
         mgCtx.arc(target.x, target.y, target.radius, 0, Math.PI * 2);
         mgCtx.fill();
+        mgCtx.shadowBlur = 0;
         
-        if (target.y > miniGameCanvas.height) {
+        // Remove targets that go off screen
+        if (target.y > miniGameCanvas.height + target.radius) {
           miniGameTargets.splice(i, 1);
         }
       }
@@ -524,37 +579,57 @@
         const bullet = miniGameBullets[i];
         bullet.y -= bullet.speed;
         
+        // Draw bullet with glow
+        mgCtx.shadowColor = '#ff69b4';
+        mgCtx.shadowBlur = 5;
         mgCtx.fillStyle = '#ff69b4';
         mgCtx.beginPath();
-        mgCtx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+        mgCtx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
         mgCtx.fill();
+        mgCtx.shadowBlur = 0;
         
         // Check collision with targets
         for (let j = miniGameTargets.length - 1; j >= 0; j--) {
           const target = miniGameTargets[j];
           const distance = Math.sqrt((bullet.x - target.x) ** 2 + (bullet.y - target.y) ** 2);
           
-          if (distance < target.radius + 3) {
+          if (distance < target.radius + 4) {
+            // Hit! Remove target and bullet
             miniGameTargets.splice(j, 1);
             miniGameBullets.splice(i, 1);
             miniGameScoreValue += 10;
             miniGameScore.textContent = miniGameScoreValue;
+            
+            // Create explosion effect
+            for (let k = 0; k < 8; k++) {
+              const angle = (k / 8) * Math.PI * 2;
+              const speed = 3;
+              miniGameBullets.push({
+                x: target.x + Math.cos(angle) * 20,
+                y: target.y + Math.sin(angle) * 20,
+                speed: speed,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                isExplosion: true
+              });
+            }
             break;
           }
         }
         
-        if (bullet.y < 0) {
+        // Remove bullets that go off screen
+        if (bullet.y < -10) {
           miniGameBullets.splice(i, 1);
         }
       }
       
-      // Spawn new targets
-      if (Math.random() < 0.02) {
+      // Spawn new targets randomly
+      if (Math.random() < 0.03) {
         miniGameTargets.push({
-          x: Math.random() * miniGameCanvas.width,
-          y: -20,
-          radius: Math.random() * 10 + 10,
-          speed: Math.random() * 2 + 1,
+          x: Math.random() * (miniGameCanvas.width - 40) + 20,
+          y: -30,
+          radius: Math.random() * 8 + 12,
+          speed: Math.random() * 1.5 + 0.5,
           color: `hsl(${Math.random() * 360}, 70%, 60%)`
         });
       }
@@ -562,37 +637,65 @@
       requestAnimationFrame(gameLoop);
     };
     
+    // Start the game loop
     gameLoop();
     
     // Click to shoot
-    miniGameCanvas.addEventListener('click', (e) => {
+    const handleClick = (e) => {
+      if (!miniGameActive) return;
+      
       const rect = miniGameCanvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       
-      miniGameBullets.push({
-        x: x,
-        y: miniGameCanvas.height,
-        speed: 5
-      });
-    });
+      // Only shoot if clicking within canvas bounds
+      if (x >= 0 && x <= miniGameCanvas.width && y >= 0 && y <= miniGameCanvas.height) {
+        miniGameBullets.push({
+          x: x,
+          y: miniGameCanvas.height - 10,
+          speed: 8
+        });
+      }
+    };
+    
+    miniGameCanvas.addEventListener('click', handleClick);
     
     // Timer
-    const timer = setInterval(() => {
+    gameTimer = setInterval(() => {
       miniGameTimeLeft--;
       miniGameTime.textContent = miniGameTimeLeft;
       
       if (miniGameTimeLeft <= 0) {
-        clearInterval(timer);
+        clearInterval(gameTimer);
+        miniGameCanvas.removeEventListener('click', handleClick);
         stopMiniGame();
-        alert(`Game Over! Final Score: ${miniGameScoreValue}`);
+        
+        // Show final score
+        setTimeout(() => {
+          alert(`🎯 Game Over! Final Score: ${miniGameScoreValue}`);
+        }, 100);
       }
     }, 1000);
+    
+    // Store cleanup function
+    miniGameOverlay.gameCleanup = () => {
+      clearInterval(gameTimer);
+      miniGameCanvas.removeEventListener('click', handleClick);
+    };
   }
 
   function stopMiniGame() {
     miniGameActive = false;
     miniGameOverlay.classList.add('hidden');
+    
+    // Clean up game resources
+    if (miniGameOverlay.gameCleanup) {
+      miniGameOverlay.gameCleanup();
+    }
+    
+    // Clear arrays
+    miniGameTargets.length = 0;
+    miniGameBullets.length = 0;
   }
 
   // Confetti storm
