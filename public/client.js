@@ -100,7 +100,21 @@
   const avatars = [];
   const background = new Image();
   background.src = 'images/background.png';
-
+  
+  // Canvas scaling variables
+  let canvasScale = 1;
+  let canvasOffsetX = 0;
+  let canvasOffsetY = 0;
+  
+  // Mobile detection
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Track the selected avatar index
+  let selectedAvatarIndex = 0;
+  
+  // Player ID
+  let myId = null;
+  
   // Players keyed by socket id
   let myPlayer = null;
   let players = {};
@@ -1214,8 +1228,11 @@
     gameScreen.classList.remove('hidden');
     gameScreen.style.display = 'flex';
     
-    // Initialize canvas scaling after game starts
-    setTimeout(initCanvasScaling, 100);
+    // Initialize canvas scaling immediately
+    initCanvasScaling();
+    
+    // Start the draw loop
+    requestAnimationFrame(draw);
   });
 
   // Keyboard input for movement
@@ -1224,8 +1241,8 @@
     console.log('Key down:', e.key);
     keys[e.key] = true;
     
-    // Prevent default for movement keys to avoid page scrolling
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
+    // Only prevent default for movement keys when game is active (not during login)
+    if (gameScreen.style.display === 'flex' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
       e.preventDefault();
     }
   });
@@ -1686,14 +1703,27 @@
 
   // Main draw loop
   function draw() {
+    // Debug: Check if canvas and context exist
+    if (!canvas || !ctx) {
+      console.error('Canvas or context not found!');
+      return;
+    }
+    
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Debug: Check if background is loaded
+    if (!background.complete) {
+      console.log('Background not loaded yet, drawing placeholder');
+      ctx.fillStyle = '#87CEEB'; // Sky blue placeholder
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else {
+      // Draw background
+      ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+    }
+    
     // Check for nearby weapons
     checkNearbyWeapons();
-    
-    // Draw background
-    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
     
     // Draw weapons on the map
     weapons.forEach(weapon => {

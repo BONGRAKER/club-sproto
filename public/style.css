@@ -1267,7 +1267,7 @@ body {
 /* Crypto Trading Button */
 .crypto-btn {
   position: fixed;
-  top: 20px;
+  top: 60px;
   left: 20px;
   background: linear-gradient(135deg, #f7931a, #ffd700);
   color: white;
