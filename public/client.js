@@ -1318,7 +1318,7 @@
         socket.emit('pickupWeapon', nearbyWeapon.id);
         weaponContextMenu.classList.add('hidden');
         nearbyWeapon = null;
-        addChatMessage('⚔️ Weapon picked up!');
+        addChatMessage('⚔️ Weapon picked up!'); // Only show to picking player
       }
     }
   });
@@ -1463,9 +1463,11 @@
     // Show earning notification if bitcoins increased
     if (data.bitcoins > oldBitcoins) {
       const earned = data.bitcoins - oldBitcoins;
-      if (earned === 10) {
+      if (data.isPassiveIncome) {
+        // Only show passive income message to the earning player
         addChatMessage(`💰 You earned ${earned} bitcoins! (Passive income)`);
       } else {
+        // Show theft message to all players
         addChatMessage(`💰 You stole ${earned} bitcoins!`);
       }
     }
@@ -1590,7 +1592,7 @@
             myCryptoHoldings = data.newHoldings;
             updateBitcoinDisplay(myBitcoins);
             updatePortfolio();
-            addChatMessage(data.message);
+            addChatMessage(`📈 ${data.message}`); // Only show to trading player
             savePlayerData();
           } else {
             addChatMessage(`❌ ${data.error}`);
@@ -1621,7 +1623,7 @@
             myCryptoHoldings = data.newHoldings;
             updateBitcoinDisplay(myBitcoins);
             updatePortfolio();
-            addChatMessage(data.message);
+            addChatMessage(`📉 ${data.message}`); // Only show to trading player
             savePlayerData();
           } else {
             addChatMessage(`❌ ${data.error}`);

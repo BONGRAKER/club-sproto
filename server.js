@@ -113,14 +113,15 @@ function earnBitcoins() {
     if (players[playerId] && !players[playerId].isDead) {
       players[playerId].bitcoins = (players[playerId].bitcoins || 0) + 10;
       io.to(playerId).emit('bitcoinUpdate', {
-        bitcoins: players[playerId].bitcoins
+        bitcoins: players[playerId].bitcoins,
+        isPassiveIncome: true // Flag to identify passive income
       });
     }
   });
 }
 
-// Start Bitcoin earning every 10 seconds
-setInterval(earnBitcoins, 10000);
+// Start Bitcoin earning every 1 minute (60000ms)
+setInterval(earnBitcoins, 60000);
 
 // Spawn weapons randomly on the map
 function spawnWeapon() {
