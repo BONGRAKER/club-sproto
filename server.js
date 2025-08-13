@@ -59,6 +59,42 @@ const players = {};
 const weapons = [];
 const bitcoins = [];
 
+// Crypto trading system
+const cryptoMarket = {
+  bitcoinPrice: 100, // Starting price
+  priceHistory: [100],
+  volatility: 0.05,
+  lastUpdate: Date.now(),
+  updateInterval: 5000 // Update every 5 seconds
+};
+
+// Update crypto prices
+function updateCryptoPrices() {
+  const now = Date.now();
+  if (now - cryptoMarket.lastUpdate > cryptoMarket.updateInterval) {
+    // Simulate price movement with some randomness
+    const change = (Math.random() - 0.5) * cryptoMarket.volatility * cryptoMarket.bitcoinPrice;
+    cryptoMarket.bitcoinPrice = Math.max(10, cryptoMarket.bitcoinPrice + change);
+    cryptoMarket.priceHistory.push(cryptoMarket.bitcoinPrice);
+    
+    // Keep only last 100 price points
+    if (cryptoMarket.priceHistory.length > 100) {
+      cryptoMarket.priceHistory.shift();
+    }
+    
+    cryptoMarket.lastUpdate = now;
+    
+    // Broadcast price update to all players
+    io.emit('cryptoUpdate', {
+      price: cryptoMarket.bitcoinPrice,
+      history: cryptoMarket.priceHistory
+    });
+  }
+}
+
+// Start crypto price updates
+setInterval(updateCryptoPrices, 1000);
+
 // Weapon types with damage and range
 const weaponTypes = [
   { name: 'Sword', emoji: '⚔️', damage: 25, range: 80 },
@@ -135,6 +171,56 @@ app.post('/upload-avatar', upload.single('avatar'), (req, res) => {
   }
 });
 
+// Get crypto market data
+app.get('/api/crypto', (req, res) => {
+  res.json({
+    price: cryptoMarket.bitcoinPrice,
+    history: cryptoMarket.priceHistory
+  });
+});
+
+// Handle crypto trading
+app.post('/api/trade', (req, res) => {
+  const { action, amount, playerId } = req.body;
+  const player = players[playerId];
+  
+  if (!player) {
+    return res.status(404).json({ error: 'Player not found' });
+  }
+  
+  if (action === 'buy') {
+    const cost = amount * cryptoMarket.bitcoinPrice;
+    if (player.bitcoins >= cost) {
+      player.bitcoins -= cost;
+      player.cryptoHoldings = (player.cryptoHoldings || 0) + amount;
+      res.json({ 
+        success: true, 
+        newBitcoins: player.bitcoins,
+        newHoldings: player.cryptoHoldings,
+        message: `Bought ${amount} $BITCOIN for ${cost.toFixed(2)} bitcoins`
+      });
+    } else {
+      res.status(400).json({ error: 'Insufficient bitcoins' });
+    }
+  } else if (action === 'sell') {
+    if (player.cryptoHoldings >= amount) {
+      const value = amount * cryptoMarket.bitcoinPrice;
+      player.bitcoins += value;
+      player.cryptoHoldings -= amount;
+      res.json({ 
+        success: true, 
+        newBitcoins: player.bitcoins,
+        newHoldings: player.cryptoHoldings,
+        message: `Sold ${amount} $BITCOIN for ${value.toFixed(2)} bitcoins`
+      });
+    } else {
+      res.status(400).json({ error: 'Insufficient $BITCOIN holdings' });
+    }
+  } else {
+    res.status(400).json({ error: 'Invalid action' });
+  }
+});
+
 // Get list of available avatars
 app.get('/avatars', (req, res) => {
   try {
@@ -191,7 +277,8 @@ io.on('connection', (socket) => {
       weaponRange: 50,
       isDead: false,
       lastAttack: 0,
-      bitcoins: 0 // Initialize bitcoins
+      bitcoins: data.bitcoins || 0, // Load from persistent data
+      cryptoHoldings: data.cryptoHoldings || 0 // Load from persistent data
     };
     
     players[socket.id] = player;
@@ -204,6 +291,12 @@ io.on('connection', (socket) => {
     
     // Send current weapons to the new player
     socket.emit('currentWeapons', weapons);
+    
+    // Send current crypto market data
+    socket.emit('cryptoUpdate', {
+      price: cryptoMarket.bitcoinPrice,
+      history: cryptoMarket.priceHistory
+    });
     
     // Broadcast new player to all other players
     socket.broadcast.emit('playerJoined', {

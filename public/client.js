@@ -83,6 +83,18 @@
   const pickupWeaponBtn = document.getElementById('pickupWeaponBtn');
   const weaponName = document.getElementById('weaponName');
   const weaponStats = document.getElementById('weaponStats');
+  const cryptoTrading = document.getElementById('cryptoTrading');
+  const openCrypto = document.getElementById('openCrypto');
+  const closeCrypto = document.getElementById('closeCrypto');
+  const currentPrice = document.getElementById('currentPrice');
+  const priceChange = document.getElementById('priceChange');
+  const priceChartCanvas = document.getElementById('priceChart');
+  const tradeAmount = document.getElementById('tradeAmount');
+  const buyCrypto = document.getElementById('buyCrypto');
+  const sellCrypto = document.getElementById('sellCrypto');
+  const portfolioBitcoins = document.getElementById('portfolioBitcoins');
+  const portfolioCrypto = document.getElementById('portfolioCrypto');
+  const totalValue = document.getElementById('totalValue');
 
   // Game state
   const avatars = [];
@@ -90,45 +102,33 @@
   background.src = 'images/background.png';
 
   // Players keyed by socket id
-  const players = {};
-  let myId = null;
   let myPlayer = null;
-
-  // Track the selected avatar index
-  let selectedAvatarIndex = 0;
-
-  // Canvas scaling for mobile
-  let canvasScale = 1;
-  let canvasOffsetX = 0;
-  let canvasOffsetY = 0;
-
-  // Mobile detection
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-  // Interactive features state
-  let weatherActive = false;
-  let dancePartyMode = false;
-  let weatherElements = [];
-  let confettiPieces = [];
-  let miniGameActive = false;
-  let miniGameScoreValue = 0;
-  let miniGameTimeLeft = 30;
-  let miniGameTargets = [];
-  let miniGameBullets = [];
-  
-  // Combat state
-  const weapons = [];
+  let players = {};
+  let weapons = [];
   let myWeapon = 'Fists';
   let myWeaponDamage = 10;
   let myWeaponRange = 50;
   let lastAttackTime = 0;
-  let attackCooldown = 1000; // 1 second
+  let attackCooldown = 1000;
   let myBitcoins = 0;
+  let myCryptoHoldings = 0;
   let nearbyWeapon = null;
 
-  // Particle system for cool effects
-  const particles = [];
-  const sparkles = [];
+  // Crypto trading state
+  let cryptoPrice = 100;
+  let cryptoHistory = [100];
+  let priceChart = null;
+  let lastPrice = 100;
+
+  // Interactive features state
+  let weatherActive = false;
+  let dancePartyMode = false;
+  let miniGameActive = false;
+  let confettiPieces = [];
+  let sparkles = [];
+
+  // Particle effects
+  let particles = [];
   
   // Emote system - INCREASED BY 5X!
   const emotes = {
@@ -1193,10 +1193,19 @@
       return;
     }
     
-    // Send new player message
+    // Load persistent data
+    const savedData = loadPlayerData();
+    if (savedData) {
+      myBitcoins = savedData.bitcoins || 0;
+      myCryptoHoldings = savedData.cryptoHoldings || 0;
+    }
+    
+    // Send new player message with persistent data
     socket.emit('newPlayer', {
       name,
-      avatar: avatars[selectedAvatarIndex].file
+      avatar: avatars[selectedAvatarIndex].file,
+      bitcoins: myBitcoins,
+      cryptoHoldings: myCryptoHoldings
     });
     
     // Hide the login overlay and reveal the game
@@ -1460,6 +1469,33 @@
         addChatMessage(`💰 You stole ${earned} bitcoins!`);
       }
     }
+    
+    // Save data when bitcoins change
+    savePlayerData();
+  });
+  
+  // Handle crypto market updates
+  socket.on('cryptoUpdate', (data) => {
+    const oldPrice = cryptoPrice;
+    cryptoPrice = data.price;
+    cryptoHistory = data.history;
+    
+    // Update price display
+    currentPrice.textContent = `$${cryptoPrice.toFixed(2)}`;
+    
+    // Calculate and display price change
+    const change = cryptoPrice - oldPrice;
+    const changePercent = (change / oldPrice) * 100;
+    priceChange.textContent = `${change >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`;
+    priceChange.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+    
+    // Update portfolio if trading interface is open
+    if (!cryptoTrading.classList.contains('hidden')) {
+      updatePortfolio();
+    }
+    
+    // Redraw price chart
+    drawPriceChart();
   });
   
   // Handle player death and Bitcoin theft
@@ -1502,6 +1538,149 @@
     addChatMessage(`🔄 ${player?.name || 'Player'} has respawned!`);
     playSound(respawnSound);
   });
+
+  // Persistent data management
+  function savePlayerData() {
+    const data = {
+      name: myPlayer?.name || '',
+      avatar: myPlayer?.avatar || 'gremlin1.png',
+      bitcoins: myBitcoins,
+      cryptoHoldings: myCryptoHoldings
+    };
+    localStorage.setItem('clubSprotoData', JSON.stringify(data));
+  }
+
+  function loadPlayerData() {
+    const data = localStorage.getItem('clubSprotoData');
+    if (data) {
+      return JSON.parse(data);
+    }
+    return null;
+  }
+
+  // Crypto trading functions
+  function initCryptoTrading() {
+    // Open/close crypto trading
+    openCrypto.addEventListener('click', () => {
+      cryptoTrading.classList.remove('hidden');
+      updatePortfolio();
+    });
+    
+    closeCrypto.addEventListener('click', () => {
+      cryptoTrading.classList.add('hidden');
+    });
+    
+    // Buy crypto
+    buyCrypto.addEventListener('click', () => {
+      const amount = parseFloat(tradeAmount.value);
+      if (amount > 0 && myBitcoins >= amount * cryptoPrice) {
+        fetch('/api/trade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'buy',
+            amount: amount,
+            playerId: socket.id
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            myBitcoins = data.newBitcoins;
+            myCryptoHoldings = data.newHoldings;
+            updateBitcoinDisplay(myBitcoins);
+            updatePortfolio();
+            addChatMessage(data.message);
+            savePlayerData();
+          } else {
+            addChatMessage(`❌ ${data.error}`);
+          }
+        });
+      } else {
+        addChatMessage('❌ Insufficient bitcoins or invalid amount');
+      }
+    });
+    
+    // Sell crypto
+    sellCrypto.addEventListener('click', () => {
+      const amount = parseFloat(tradeAmount.value);
+      if (amount > 0 && myCryptoHoldings >= amount) {
+        fetch('/api/trade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'sell',
+            amount: amount,
+            playerId: socket.id
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            myBitcoins = data.newBitcoins;
+            myCryptoHoldings = data.newHoldings;
+            updateBitcoinDisplay(myBitcoins);
+            updatePortfolio();
+            addChatMessage(data.message);
+            savePlayerData();
+          } else {
+            addChatMessage(`❌ ${data.error}`);
+          }
+        });
+      } else {
+        addChatMessage('❌ Insufficient $BITCOIN or invalid amount');
+      }
+    });
+  }
+
+  function updatePortfolio() {
+    portfolioBitcoins.textContent = myBitcoins.toFixed(2);
+    portfolioCrypto.textContent = myCryptoHoldings.toFixed(2);
+    const total = myBitcoins + (myCryptoHoldings * cryptoPrice);
+    totalValue.textContent = total.toFixed(2);
+  }
+
+  function drawPriceChart() {
+    const ctx = priceChartCanvas.getContext('2d');
+    ctx.clearRect(0, 0, priceChartCanvas.width, priceChartCanvas.height);
+    
+    if (cryptoHistory.length < 2) return;
+    
+    const width = priceChartCanvas.width;
+    const height = priceChartCanvas.height;
+    const padding = 20;
+    
+    const minPrice = Math.min(...cryptoHistory);
+    const maxPrice = Math.max(...cryptoHistory);
+    const priceRange = maxPrice - minPrice || 1;
+    
+    ctx.strokeStyle = '#f7931a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    cryptoHistory.forEach((price, index) => {
+      const x = padding + (index / (cryptoHistory.length - 1)) * (width - 2 * padding);
+      const y = height - padding - ((price - minPrice) / priceRange) * (height - 2 * padding);
+      
+      if (index === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    
+    ctx.stroke();
+    
+    // Draw current price line
+    ctx.strokeStyle = '#4caf50';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padding, height - padding - ((cryptoPrice - minPrice) / priceRange) * (height - 2 * padding));
+    ctx.lineTo(width - padding, height - padding - ((cryptoPrice - minPrice) / priceRange) * (height - 2 * padding));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   // Main draw loop
   function draw() {
@@ -1765,16 +1944,52 @@
   setInterval(triggerRandomEvent, 20000);
 
   // Initialize the game
-  loadAvatars().then(() => {
-    // Initialize music, mobile controls, emote controls, and interactive features
-    initMusic();
-    initMobileControls();
-    initEmoteControls();
-    initInteractiveFeatures();
-    initCombatControls(); // Initialize combat controls
-    initContextMenu(); // Initialize context menu
+  function init() {
+    // Load saved data and pre-fill form
+    const savedData = loadPlayerData();
+    if (savedData) {
+      usernameInput.value = savedData.name || '';
+    }
     
-    // Start the draw loop
-    requestAnimationFrame(draw);
-  });
+    // Load avatars first, then initialize everything else
+    loadAvatars().then(() => {
+      // Set saved avatar after avatars are loaded
+      if (savedData) {
+        const savedAvatarIndex = avatars.findIndex(avatar => avatar.file === savedData.avatar);
+        if (savedAvatarIndex !== -1) {
+          selectedAvatarIndex = savedAvatarIndex;
+          updateAvatarSelection();
+        }
+      }
+      
+      // Initialize music
+      initMusic();
+      
+      // Initialize mobile controls
+      initMobileControls();
+      
+      // Initialize emote controls
+      initEmoteControls();
+      
+      // Initialize interactive features
+      initInteractiveFeatures();
+      
+      // Initialize combat controls
+      initCombatControls();
+      
+      // Initialize context menu
+      initContextMenu();
+      
+      // Initialize crypto trading
+      initCryptoTrading();
+      
+      // Draw initial price chart
+      drawPriceChart();
+      
+      // Start the draw loop
+      requestAnimationFrame(draw);
+    });
+  }
+
+  init();
 })();
